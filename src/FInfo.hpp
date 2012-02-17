@@ -17,17 +17,17 @@ struct FInfo {
 	enum Type { Local, Downloading, Remote} type;
 
 	FInfo()=default;
-	FInfo(boost::filesystem::path p, Hash h, int cn, size_t ls)
+	FInfo(const std::string& p, Hash h, int cn, size_t ls)
 	  : path(p), hash(h), chunknum(cn), lastchunksize(ls){}
 };
 
 class FInfoManager {
 public:
-	FInfo path2info(path);
+	FInfo path2info(const std::string& path);
 	void add_category(const std::string&);
 	void add_info(const std::string&, const FInfo&);
 	void del_info(const std::string&, const Hash&);
-	const FInfo& find_info(const Hash&);
+	const FInfo& find(const std::string& c, const Hash& h);
 private:
 	std::map<std::string, std::map<Hash, FInfo> > infos_;
 };

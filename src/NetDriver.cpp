@@ -5,65 +5,62 @@
 using namespace boost::asio;
 using namespace std;
 namespace pl = std::placeholders;
-
-NetDriver& theND()
-{
-  static NetDriver nd(18068, 18069);
-  return nd;
-}
+const int PINFO = 18068;
+const int PDATA = 18069;
 
 void NetDriver::run()
 {
-  io_service_.run();
+  while (io_service_.run_one()) {
+	  while (io_service_.poll_one())
+		;
+	  queue_.execute_all();
+  }
 }
 
-NetDriver::NetDriver(int pinfo, int pdata) 
-: pinfo_(pinfo),
-	pdata_(pdata),
-	sinfo_(io_service_, ip::udp::endpoint(ip::udp::v4(), pinfo_)),
-	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), pdata_)),
+NetDriver::NetDriver()
+	:sinfo_(io_service_, ip::udp::endpoint(ip::udp::v4(), PINFO)),
+	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), PDATA)),
 	ssend_(io_service_, ip::udp::v4()),
 	timer_(io_service_)
 { 
-  this->sinfo_.async_receive(buffer(ibuf_), bind(&NetDriver::receive_info, this, pl::_1, pl::_2));
-  this->sdata_.async_receive(buffer(dbuf_), bind(&NetDriver::receive_data, this, pl::_1, pl::_2));
+  this->sinfo_.async_receive(buffer(ibuf_), queue_.wrap(100, bind(&NetDriver::receive_info, this, pl::_1, pl::_2)));
+  this->sdata_.async_receive(buffer(dbuf_), queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
 
   ssend_.set_option(socket_base::broadcast(true));
 }
 
-void NetDriver::register_plugin(const PluginType type, const std::string& key, ReceiveFunction cb);
+void NetDriver::register_plugin(const PluginType type, const std::string& key, ReceiveFunction cb)
 {
   if (key.size() > 16) {
 	  cerr << "Warning: KeySize must smaller than 16\n";
   }
   if (type == INFO)
-	this->cb_info_map_.insert(make_pair(key, cb));
+	this->cb_info_.insert(make_pair(key, cb));
   else if (type == DATA)
-	this->cb_data_map_.insert(make_pair(key, cb));
+	this->cb_data_.insert(make_pair(key, cb));
 }
 
-template<typename SequenceBuffer>
-void NetDriver::info_send(SequenceBuffer buffer)
+void NetDriver::info_send(NetBufPtr buffer)
 {
-  static ip::udp::endpoint imulticast(ip::address::from_string("255.255.255.255"), _pinfo);
-  this->ssend_.send_to(buffer, imulticast_);
+  static ip::udp::endpoint imulticast(ip::address::from_string("255.255.255.255"), PINFO);
+  io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), imulticast);}));
 }
 
-template<typename SequenceBuffer>
-void NetDriver::data_send(SequenceBuffer buffer) 
+void NetDriver::data_send(NetBufPtr buffer) 
 {
-  static boost::asio::ip::udp::endpoint dmulticast(ip::address::from_string("255.255.255.255"), _pdata);
-  this->ssend_.send_to(buffer, dmulticast);
+  static boost::asio::ip::udp::endpoint dmulticast(ip::address::from_string("255.255.255.255"), PDATA);
+  io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), dmulticast);}));
 }
 
 void NetDriver::receive_info(const boost::system::error_code& ec, size_t byte_transferred)
 {
   if (!ec && byte_transferred > 0) {
 	  //发送info_receive信号以便业务模块可以处理具体数据
-	  handle_receive(cb_info_, ibuf_, byte_transferred);
+	  handle_receive(cb_info_, ibuf_.data(), byte_transferred);
 
 	  //继续监听
-	  this->sinfo_.async_receive(buffer(ibuf_), bind(&NetDriver::receive_info, this, _1, _2));
+	  this->sinfo_.async_receive(buffer(ibuf_),
+								 queue_.wrap(100, bind(&NetDriver::receive_info, this, pl::_1, pl::_2)));
 
   } else {
 	  cerr << "Error:" << boost::system::system_error(ec).what();
@@ -74,10 +71,11 @@ void NetDriver::receive_data(const boost::system::error_code& ec, size_t byte_tr
 {
   if (!ec && byte_transferred > 0) {
 	  //发送data_receive信号以便业务模块可以处理具体数据
-	  handle_receive(cb_data_, dbuf_, byte_transferred);
+	  handle_receive(cb_data_, dbuf_.data(), byte_transferred);
 
 	  //继续监听
-	  this->sdata_.async_receive(buffer(dbuf_), bind(&NetDriver::receive_data, this, _1, _2));
+	  this->sdata_.async_receive(buffer(dbuf_), 
+								 queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
 
   } else {
 	  cerr << "Error:" << boost::system::system_error(ec).what();
@@ -99,8 +97,14 @@ void NetDriver::handle_receive(CBS& cbs, const char* data, size_t s)
   }
 }
 
-void NetDriver::start_timer(int s, std::function<void()>& cb)
+void NetDriver::start_timer(int s, std::function<void()> cb)
 {
   timer_.expires_from_now(boost::posix_time::seconds(s));
-  timer_.async_wait([&](boost::system::error_code){cb();});
+  //定时器拥有较高优先级
+  timer_.async_wait(queue_.wrap(50, [&](boost::system::error_code){cb();}));
+}
+void NetDriver::on_idle(std::function<void()> cb)
+{
+  //空闲进程的优先级最低
+  io_service_.post(queue_.wrap(0, cb));
 }

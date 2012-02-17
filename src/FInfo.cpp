@@ -23,7 +23,7 @@ FInfo FInfoManager::path2info(const std::string& path)
 	uintmax_t filesize;
 
 	filesize = filesystem::file_size(path);
-	iostream::mapped_file file(path, ios_base::out);
+	iostreams::mapped_file file(path, ios_base::out);
 
 	hash = hash_data(file.data(), filesize);
 
@@ -32,7 +32,7 @@ FInfo FInfoManager::path2info(const std::string& path)
 	lastchunksize = filesize % FInfo::chunksize;
 	chunknum += lastchunksize > 0 ? 1: 0;
 
-	MFInfo info(path, hash, chunknum, lastchunksize);
+	FInfo info(path, hash, chunknum, lastchunksize);
 	return info;
 }
 
@@ -48,10 +48,10 @@ void FInfoManager::add_info(const std::string& c, const FInfo& f)
 
 void FInfoManager::del_info(const std::string& c, const Hash& h)
 {
-  infos_[c].remove(h);
+  infos_[c].erase(h);
 }
 
-const FInfo& FInfoManager::find_info(const std::string& c, const Hash& h)
+const FInfo& FInfoManager::find(const std::string& c, const Hash& h)
 {
   return infos_[c].find(h)->second;
 }

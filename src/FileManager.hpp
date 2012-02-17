@@ -2,28 +2,27 @@
 #define __FILEMANAGER_HPP__
 
 #include "FInfo.hpp"
+#include "Transport.hpp"
+#include <vector>
+#include <map>
+#include <string>
 
 class FileManager {
 public:
   FileManager();
 
-  FInfo upload(std::string path);
-  vector<MFInfo> infos();
+  void upload(const std::string& path);
+  std::vector<FInfo> current_list();
 
-  void download(Hash h);
-  void stop(Hash h);
+  void download(const Hash& h);
+  void stop(const Hash& h);
 
-  void remove(Hash h);
+  void remove(const Hash& h);
 
-  void on_complete(Hash file_hash);
+  void on_complete(const Hash& h);
 private:
-  map<Hash, FInfo> tmps_;
-  Transport port_;
+  FInfoManager info_manager_;
+  Transport transport_;
 };
 
-inline
-FileManager& theMFM() {
-	static FileManager m;;
-	return m;
-}
 #endif

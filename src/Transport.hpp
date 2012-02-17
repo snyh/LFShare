@@ -2,7 +2,9 @@
 #define _TRANSPOR_HPP__
 #include <string>
 #include <map>
+#include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/dynamic_bitset.hpp>
+#include "NetDriver.hpp"
 
 typedef std::string Hash;
 
@@ -10,27 +12,41 @@ struct Payload {
 	int global;
 	std::map<Hash, int> files;
 };
+class NativeFile {
+public:
+  NativeFile(std::string path);
+  ~NativeFile();
+  void write(long begin, const char* data, size_t s);
+  void read(long begin, char* data, size_t s);
+private:
+  boost::iostreams::mapped_file file_;
+};
 
 class NetDriver;
-class NativeFile;
 class FInfoManager;
 class Bill;
+class Chunk;
 
 class Transport {
 public:
   	Transport(FInfoManager& info_manager);
-	void begin_receive(const Hash& file_hash);
+	void start_receive(const Hash& file_hash);
 	void stop_receive(const Hash& file_hash);
 	void add_local_file(const Hash& file_hash, const std::string& path);
 	void del_local_file(const Hash& file_hash);
-	const Payload& get_payload();
+	void add_completed_file(const Hash& h);
+	void del_completed_file(const Hash& h);
+	Payload get_payload();
 
 	void run();
 
 private:
-	void on_receive_msg();
-	void on_receive_data();
-	void record_chunk(Bill& b);
+	void send_chunks();
+	void send_bill();
+
+	void handle_chunk(const Chunk& c);
+	void handle_bill(const Bill& b);
+	void record_speed();
 
 	Payload payload_;
 	Payload payload_tmp_;

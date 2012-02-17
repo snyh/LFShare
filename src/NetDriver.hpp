@@ -89,6 +89,7 @@ class NetDriver {
 public:
   enum PluginType {INFO, DATA};
   typedef std::function<void(const char*, size_t)> ReceiveFunction;
+  typedef shared_ptr<deadline_timer> TimerPtr;
 
   NetDriver();
   void run();
@@ -99,7 +100,7 @@ public:
   void info_send(NetBufPtr buffer);
   void data_send(NetBufPtr buffer);
 
-  void start_timer(int seconds, std::function<void()> cb);
+  void start_timer(int s, std::function<void()> cb, TimerPtr timer=TimerPtr(new Timer));
   void on_idle(std::function<void()> cb);
 
 private:
@@ -123,7 +124,6 @@ private:
   CBS cb_info_;
   CBS cb_data_;
 
-  boost::asio::deadline_timer timer_;
 
   HandlerPriorityQueue queue_;
 };

@@ -97,11 +97,15 @@ void NetDriver::handle_receive(CBS& cbs, const char* data, size_t s)
   }
 }
 
-void NetDriver::start_timer(int s, std::function<void()> cb)
+void NetDriver::start_timer(int s, std::function<void()> cb, TimerPtr timer=TimerPtr(new Timer))
 {
-  timer_.expires_from_now(boost::posix_time::seconds(s));
+  timer->expires_from_now(boost::posix_time::seconds(s));
   //定时器拥有较高优先级
-  timer_.async_wait(queue_.wrap(50, [&](boost::system::error_code){cb();}));
+  timer->async_wait(queue_.wrap(50, [&](boost::system::error_code){
+								cb();
+								start_timer(s, cb, timer);
+								})
+					);
 }
 void NetDriver::on_idle(std::function<void()> cb)
 {

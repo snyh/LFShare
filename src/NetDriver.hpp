@@ -1,6 +1,7 @@
 #ifndef __NetDriver_HPP__
 #define __NetDriver_HPP__
 #include <boost/asio.hpp>
+#include <memory>
 #include <functional>
 #include <string>
 #include <array>
@@ -89,7 +90,7 @@ class NetDriver {
 public:
   enum PluginType {INFO, DATA};
   typedef std::function<void(const char*, size_t)> ReceiveFunction;
-  typedef shared_ptr<deadline_timer> TimerPtr;
+  typedef std::shared_ptr<boost::asio::deadline_timer> TimerPtr;
 
   NetDriver();
   void run();
@@ -100,8 +101,8 @@ public:
   void info_send(NetBufPtr buffer);
   void data_send(NetBufPtr buffer);
 
-  void start_timer(int s, std::function<void()> cb, TimerPtr timer=TimerPtr(new Timer));
-  void on_idle(std::function<void()> cb);
+  void start_timer(int s, std::function<void()> cb);
+  void add_task(int priority, std::function<void()> cb);
 
 private:
   typedef std::multimap<std::string, ReceiveFunction> CBS;
@@ -109,6 +110,8 @@ private:
 
   void receive_info(const boost::system::error_code& ec, size_t byte_transferred);
   void receive_data(const boost::system::error_code& ec, size_t byte_transferred);
+
+  void timer_helper(TimerPtr timer, int s, std::function<void()> cb);
 
 private:
   boost::asio::io_service io_service_;
@@ -123,7 +126,6 @@ private:
 
   CBS cb_info_;
   CBS cb_data_;
-
 
   HandlerPriorityQueue queue_;
 };

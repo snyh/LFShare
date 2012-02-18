@@ -6,29 +6,79 @@
 using namespace std;
 using namespace boost;
 
+class ByteReader {
+public:
+  ByteReader(const char* data, size_t s)
+	: pos_(0), data_(data), max_size_(s) {}
+  template<typename T>
+	T read() {
+		T t = *(T*)(data_+pos_);
+		pos_ += sizeof(T);
+		return t;
+	}
+  string str(int size) {
+	  string str(data_+pos_, size);
+	  pos_ += size;
+	  //if (pos_ > max_size_)
+	  return str;
+  }
+  string str() {
+	  int s = this->read<int>();
+	  return str(s);
+  }
+  const char* data() { return data_ + pos_; }
+
+private:
+  int pos_;
+  const char* data_;
+  size_t max_size_;
+};
+
+FInfo info_from_net(const char* data, size_t s)
+{
+  ByteReader r(data, s);
+  FInfo info(r.str(16), //file_hash
+			 r.str(), //file_path
+			 r.read<int>(), //chunknum
+			 r.read<size_t>()); //lastchunksize
+  info.type = FInfo::Remote;
+  return info;
+}
+
+NetBufPtr info_to_net(FInfo& info)
+{
+  NetBufPtr buf(new NetBuf);
+  buf->add_val("FILEINFO\n");
+  buf->add_val(info.hash);
+  buf->add_val(filesystem::basename(info.path));
+  buf->add_val(&(info.chunknum), sizeof(int));
+  buf->add_val(&(info.lastchunksize), sizeof(size_t));
+  return buf;
+}
+
 //Chunk用来包装一块数据(当前默认大小64KB)，可以在网络上进行安全的传输
 //可以通过Chunk来组装完整的文件。
 //Chunk本身不动态分配内存,因此Chunk体积较小,大概占用40byte的内存(32位系统)，
 struct Chunk {
 	Chunk(Hash fh, int i, size_t s, const char* d) 
 	  : file_hash(fh),
-	  	chunk_hash(d, s),
-		index(i),
-		size(s),
-		data(d),
-		is_valid_(true) {
-	}
+	  chunk_hash(d, s),
+	  index(i),
+	  size(s),
+	  data(d),
+	  is_valid_(true) {
+	  }
 	Chunk(Hash fh, Hash h, int i, size_t s, const char* d) 
 	  : file_hash(fh),
-	  	chunk_hash(h),
-		index(i),
-		size(s),
-		data(d) {
-	  if (chunk_hash == hash_data(data, size))
-		is_valid_ = true;
-	  else
-		is_valid_ = false;
-	}
+	  chunk_hash(h),
+	  index(i),
+	  size(s),
+	  data(d) {
+		  if (chunk_hash == hash_data(data, size))
+			is_valid_ = true;
+		  else
+			is_valid_ = false;
+	  }
 
 	bool valid() const { return is_valid_; }
 	Hash file_hash;
@@ -39,49 +89,7 @@ struct Chunk {
 private:
 	bool is_valid_;
 };
-struct Bill {
-	Hash hash;
-	boost::dynamic_bitset<> bits;
-};
 
-
-class ByteReader {
-public:
-	ByteReader(const char* data, size_t s)
-	  : pos_(0), data_(data), max_size_(s) {}
-	template<typename T>
-	  T read() {
-		  T t = *(T*)(data_+pos_);
-		  pos_ += sizeof(T);
-		  return t;
-	  }
-	string str(int size) {
-		string str(data_+pos_, size);
-		pos_ += size;
-		//if (pos_ > max_size_)
-		return str;
-	}
-	string str() {
-		int s = this->read<int>();
-		return str(s);
-	}
-	const char* data() { return data_ + pos_; }
-
-private:
-	int pos_;
-	const char* data_;
-	size_t max_size_;
-};
-
-FInfo info_from_net(const char* data, size_t s)
-{
-  ByteReader r(data, s);
-  FInfo info(r.str(16), //file_hash
-			 r.str(), //file_path
-			 r.read<int>(), //chunknum
-			 r.read<size_t>()); //lastchunksize
-  return info;
-}
 Chunk chunk_from_net(const char* data, size_t s)
 {
   ByteReader r(data, s);
@@ -92,22 +100,56 @@ Chunk chunk_from_net(const char* data, size_t s)
 		  r.data()); //data pointer
   return c;
 }
+NetBufPtr chunk_to_net(Chunk& c)
+{
+  NetBufPtr buf(new NetBuf);
+  buf->add_val("CHUNK\n");
+  buf->add_val(c.file_hash);
+  buf->add_val(c.chunk_hash);
+  buf->add_val(&(c.index), sizeof(int));
+  buf->add_val(&(c.size), sizeof(size_t));
+  buf->add_ref(c.data, c.size);
+  return buf;
+}
+
+struct Bill {
+	Hash hash;
+	boost::dynamic_bitset<> bits;
+};
+
 Bill bill_from_net(const char* data, size_t s)
 {
+  ByteReader r(data, s);
+  Bill bill;
+  bill.hash = r.str(16);
+  bill.bits = boost::dynamic_bitset<>(r.str());
+  return bill;
 }
+
 NetBufPtr bill_to_net(Bill& b)
 {
   NetBufPtr buf(new NetBuf);
-  buf->add_val("BILL");
+  buf->add_val("BILL\n");
+  buf->add_val(b.hash);
+
+  string bits;
+  to_string(b.bits, bits);
+  size_t s = bits.size();
+  buf->add_val(&(s), sizeof(size_t));
+  buf->add_val(bits);
+  return buf;
 }
 
 Transport::Transport(FInfoManager& info_manager)
-	 :info_manager_(info_manager),
-	 ndriver_()
+	:native_(5),
+	info_manager_(info_manager),
+	ndriver_()
 {
   //注册相关消息
   ndriver_.register_plugin(NetDriver::INFO, "FILEINFO", [&](const char*data, size_t s){
-						   info_manager_.add_info("ready", info_from_net(data, s));
+						   FInfo info = info_from_net(data, s);
+						   info_manager_.add_info(info);
+						   on_new_file(info);
 						   });
   ndriver_.register_plugin(NetDriver::DATA, "CHUNK", [&](const char*data, size_t s){
 						   handle_chunk(chunk_from_net(data, s));
@@ -132,13 +174,11 @@ void Transport::run()
 void Transport::handle_bill(const Bill& b)
 {
   //如果所请求文件本地拥有完整拷贝则全部添加到global_bill中
-  auto it = completed_.find(b.hash);
-  if (it != completed_.end())
+  if (completed_.count(b.hash))
 	global_bill_[b.hash] |= b.bits;
 
   //如果所请求文件在下载队列中，则统计拥有的文件块并添加到gloabl_bill中
-  it = downloading_.find(b.hash);
-  if (it != downloading_.end())
+  if (downloading_.count(b.hash)) 
 	global_bill_[b.hash] |= (~local_bill_[b.hash] & b.bits);
 }
 
@@ -148,8 +188,7 @@ void Transport::handle_chunk(const Chunk& c)
 	  payload_.global++;
 
 	  //如果是下载队列中的文件
-	  auto f_it= downloading_.find(c.file_hash);
-	  if (f_it != downloading_.end()) {
+	  if (downloading_.count(c.file_hash)) {
 
 		  //并且是此文件所缺少的文件块
 		  auto it = local_bill_.find(c.file_hash);
@@ -157,8 +196,10 @@ void Transport::handle_chunk(const Chunk& c)
 			  //就取消文件块缺失标记
 			  it->second[c.index] = false;
 			  //并写入文件
-			  auto& file = f_it->second;
-			  file.write(c.index*FInfo::chunksize, c.data, c.size);
+			  native_.write(c.file_hash, c.index*FInfo::chunksize, c.data, c.size);
+
+			  //检查是否已经完成
+			  check_complete(c.file_hash);
 
 			  //同时记录此文件有效获得一次文件块以便统计下载速度
 			  payload_.files[c.file_hash]++;
@@ -166,9 +207,9 @@ void Transport::handle_chunk(const Chunk& c)
 	  }
 
 	  //如果是全局缺少的文件块则取消文件块缺失标记
-	  auto it = global_bill_.find(c.file_hash);
-	  if (it != global_bill_.end() && it->second[c.index]) {
-		  it->second[c.index] = false;
+	  auto& it = global_bill_.find(c.file_hash);
+	  if (it != global_bill_.end() && it->second[c.index]){
+			it->second[c.index] = false;
 	  }
   }
 }
@@ -176,21 +217,21 @@ void Transport::handle_chunk(const Chunk& c)
 void send_chunk_helper(vector<Chunk>& chunks,
 					   const Hash& h,
 					   boost::dynamic_bitset<>& bits,
-					   map<Hash, NativeFile>& files,
+					   set<Hash>& files,
+					   NativeFileManager& native,
 					   map<Hash, boost::dynamic_bitset<> >& bill
 					  )
 {
-  auto it = files.find(h);
-  if (it != files.end()) {
+  if (files.count(h)) {
 	  int length = bits.size();
 	  int i;
 	  for (i=0; i<length; i++) {
 		  if (bits[i]) {
 			  size_t size = (i == length) ? : FInfo::chunksize;
 			  char* data;
-			  it->second.read(i*FInfo::chunksize, data, size);
+			  native.read(h, i*FInfo::chunksize, data, size);
 
-			  chunks.push_back(Chunk(it->first, i, size, data));
+			  chunks.push_back(Chunk(h, i, size, data));
 			  bits[i] = false; //标记已经待发送的文件块
 			  if (chunks.size() > 5)
 				return;
@@ -208,22 +249,15 @@ void Transport::send_chunks()
   //生成不多于5个文件块
   vector<Chunk> chunks;
   for (auto& bill : global_bill_) {
-	  send_chunk_helper(chunks, bill.first, bill.second, completed_, global_bill_);
+	  send_chunk_helper(chunks, bill.first, bill.second, native_, completed_, global_bill_);
 	  if (chunks.size() > 5)
 		break;
-	  send_chunk_helper(chunks, bill.first, bill.second, downloading_, global_bill_);
+	  send_chunk_helper(chunks, bill.first, bill.second, native_, downloading_, global_bill_);
   }
 
   //发送文件块数据到网络
   for (auto& c: chunks) {
-	  NetBufPtr buf(new NetBuf);
-	  buf->add_val("CHUNK");
-	  buf->add_val(c.file_hash);
-	  buf->add_val(c.chunk_hash);
-	  buf->add_val(&(c.index), sizeof(int));
-	  buf->add_val(&(c.size), sizeof(size_t));
-	  buf->add_ref(c.data, c.size);
-	  ndriver_.data_send(buf);
+	  ndriver_.data_send(chunk_to_net(c));
   }
   ndriver_.add_task(0, bind(&Transport::send_chunks, this));
 }
@@ -231,8 +265,8 @@ void Transport::send_chunks()
 void Transport::send_bill()
 {
   for (auto& t: local_bill_) {
-	  Bill bill(t.first, t.second);
-	  ndriver_.info_send(bill_to_net());
+	  Bill bill{t.first, t.second};
+	  ndriver_.info_send(bill_to_net(bill));
   }
 }
 
@@ -249,9 +283,10 @@ void Transport::record_speed()
 void Transport::start_receive(const Hash& h)
 {
   //如果当前文件不在downloading列表中则添加之
-  if (downloading_.find(h) == downloading_.end()) {
-	  auto info = info_manager_.find("downloading", h);
-	  downloading_.insert(make_pair(h, NativeFile(info.path)));
+  if (downloading_.count(h) == 0) {
+	  auto info = info_manager_.find(h, FInfo::Downloading);
+	  native_.new_file(info);
+	  downloading_.insert(h);
   }
 }
 void Transport::stop_receive(const Hash& h)
@@ -262,18 +297,13 @@ void Transport::stop_receive(const Hash& h)
 void Transport::add_completed_file(const Hash& h)
 {
   //如果所添加文件不在已完成列表中则添加
-  if (completed_.find(h) == completed_.end()) {
-	  auto info = info_manager_.find("completed", h);
-	  completed_.insert(make_pair(h, NativeFile(info.path)));
+  if (completed_.count(h) == 0) {
+	  auto info = info_manager_.find(h, FInfo::Local);
+	  native_.new_file(info);
+	  completed_.insert(h);
 
 	  //向网络发送此文件信息
-	  NetBufPtr buf(new NetBuf);
-	  buf->add_val("FILEINFO");
-	  buf->add_val(info.file_hash);
-	  buf->add_val(filesystem::basename(info.path));
-	  buf->add_val(&(info.chunknum), sizeof(int));
-	  buf->add_val(&(info.lastchunksize), sizeof(size_t));
-	  ndriver_.info_send(buf);
+	  ndriver_.info_send(info_to_net(info));
   }
 }
 
@@ -285,4 +315,91 @@ void Transport::del_completed_file(const Hash& h)
 Payload Transport::get_payload()
 {
   return payload_;
+}
+
+void Transport::check_complete(const Hash& h)
+{
+
+  FInfo info = info_manager_.find(h, FInfo::Downloading);
+
+  //如果所属文件块全部获得则移动文件信息从downloading到local去
+  auto bits = local_bill_.find(h)->second;
+  if (bits.none()) {
+	  local_bill_.erase(h);
+	  info_manager_.del_info(h);
+
+	  info.type = FInfo::Local;
+	  info_manager_.add_info(info);
+  }
+  //发送信号告知上层模块有新文件块已写入文件
+  double progress = (info.chunknum-bits.count()) / double(info.chunknum);
+  on_new_chunk(info.hash, progress);
+}
+
+
+void NativeFileManager::new_file(const FInfo& info)
+{
+  files_.insert(make_pair(info.hash, info));
+}
+
+void NativeFileManager::push_hot(const Hash& h)
+{
+  using namespace boost::iostreams;
+  FInfo& info = files_.find(h).second;
+
+  if (info.type == FInfo::Local) {
+	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readonly)));
+  } else if (info.type == FInfo::Remote) {
+	  mapped_file_params param;
+	  param.path = info.path;
+	  param.flags = mapped_file::readwrite;
+	  param.new_file_size = (info.chunknum-1) * FInfo::chunksize + info.lastchunksize;
+
+	  hot_.push_front(make_pair(info.hash, mapped_file(param)));
+  } else if (info.type == FInfo::Downloading) {
+	  files_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
+  }
+}
+
+void NativeFileManager::set_current_file(const Hash& h)
+{
+  //如果已经在hot列表最前端则直接返回
+  if (hot_.front().first == h)
+	return;
+  //如果hot列表未满则直接添加
+  if (hot_.size() < max_num_) {
+	  push_hot(h);
+	  return;
+  }
+
+  //如果此文件在hot列表中则将其位置提前，以便下次可以直接命中
+  auto& hot_it = hot_.begin();
+  for (; hot_it != hot_.end(); hot_it++) {
+	  if (hot_it->first == h) {
+		hot_.erase(hot_it);
+		push_hot(h);
+	  }
+  }
+
+  //如果此文件不在hot列表则将其加入hot中，并将hot中最后的文件关闭
+  if (hot_it == hot_.end()) {
+	  push_hot(h);
+	  hot_.back()->second.close();
+	  hot_.pop_back();
+  }
+
+  //设置当前数据流指向热度最高的文件
+  current_= hot_.front().second.data();
+}
+
+void NativeFileManager::write(const Hash& h, long begin, const char* data, size_t s)
+{
+  set_current_file(h);
+  memcpy(data, current_+begin, s);
+}
+
+void NativeFileManager::read(const Hash& h, long begin, char* data, size_t s)
+{
+  set_current_file(h);
+  memcpy(current_+begin, data, s);
 }

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
 typedef std::string Hash;
 Hash hash_data(const char* data, size_t size);
@@ -23,13 +24,17 @@ struct FInfo {
 
 class FInfoManager {
 public:
-	FInfo path2info(const std::string& path);
-	void add_category(const std::string&);
-	void add_info(const std::string&, const FInfo&);
-	void del_info(const std::string&, const Hash&);
-	const FInfo& find(const std::string& c, const Hash& h);
+	FInfo add_info(const std::string& path);
+	void add_info(const FInfo&);
+	void del_info(const Hash&);
+	const FInfo& find(const Hash& h);
+	const FInfo& find(const Hash& h, FInfo::Type);
+	std::vector<FInfo> list();
+	std::vector<FInfo> list(FInfo::Type);
 private:
-	std::map<std::string, std::map<Hash, FInfo> > infos_;
+	std::map<Hash, FInfo> local_;
+	std::map<Hash, FInfo> remote_;
+	std::map<Hash, FInfo> downloading_;
 };
 
 #endif

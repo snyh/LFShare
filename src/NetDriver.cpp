@@ -20,8 +20,7 @@ void NetDriver::run()
 NetDriver::NetDriver()
 	:sinfo_(io_service_, ip::udp::endpoint(ip::udp::v4(), PINFO)),
 	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), PDATA)),
-	ssend_(io_service_, ip::udp::v4()),
-	timer_(io_service_)
+	ssend_(io_service_, ip::udp::v4())
 { 
   this->sinfo_.async_receive(buffer(ibuf_), queue_.wrap(100, bind(&NetDriver::receive_info, this, pl::_1, pl::_2)));
   this->sdata_.async_receive(buffer(dbuf_), queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
@@ -97,18 +96,23 @@ void NetDriver::handle_receive(CBS& cbs, const char* data, size_t s)
   }
 }
 
-void NetDriver::start_timer(int s, std::function<void()> cb, TimerPtr timer=TimerPtr(new Timer))
+void NetDriver::timer_helper(TimerPtr timer, int s, std::function<void()> cb)
 {
   timer->expires_from_now(boost::posix_time::seconds(s));
-  //定时器拥有较高优先级
-  timer->async_wait(queue_.wrap(50, [&](boost::system::error_code){
+  timer->async_wait(queue_.wrap(50, [=](boost::system::error_code&){
 								cb();
-								start_timer(s, cb, timer);
+								timer_helper(timer, s, cb);
 								})
 					);
 }
-void NetDriver::on_idle(std::function<void()> cb)
+void NetDriver::start_timer(int s, std::function<void()> cb)
+{
+  TimerPtr timer(new deadline_timer(io_service_));
+  timer_helper(timer, s, cb);
+}
+
+void NetDriver::add_task(int priority, std::function<void()> cb)
 {
   //空闲进程的优先级最低
-  io_service_.post(queue_.wrap(0, cb));
+  io_service_.post(queue_.wrap(priority, cb));
 }

@@ -14,6 +14,15 @@ class InfoTypeError: public std::exception {
 
 typedef std::string Hash;
 Hash hash_data(const char* data, size_t size);
+class HashInvalid: public std::exception {
+public:
+  	HashInvalid() = default;
+	HashInvalid(const std::string& msg): m_(msg) {}
+	const char* what() const noexcept { return m_.c_str(); }
+	~HashInvalid() noexcept {}
+private:
+	std::string m_;
+};
 
 //FInfo用来描述一个File的信息，以便可以在网络上进行传输.
 struct FInfo {
@@ -48,7 +57,16 @@ public:
 	 */
 	void add_info(const FInfo&);
 
-	void del_info(const Hash&);
+	/**
+	 * @brief del_info 
+	 *
+	 * @param Hash
+	 *
+	 * @exception 如果未找到文件则抛出InfoNotFound异常
+	 *
+	 * @return 返回被删除的FInfo
+	 */
+	FInfo del_info(const Hash&);
 
 	/**
 	 * @brief find 

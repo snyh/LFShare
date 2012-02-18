@@ -18,8 +18,8 @@ Hash hash_data(const char* data, size_t size)
 FInfo FInfoManager::add_info(const std::string& path)
 {
 	Hash hash;
-	int8_t chunknum;
-	int8_t lastchunksize;
+	int32_t chunknum;
+	int32_t lastchunksize;
 	uintmax_t filesize;
 
 	filesize = filesystem::file_size(path);
@@ -51,18 +51,30 @@ void FInfoManager::add_info(const FInfo& f)
   else if (f.type == FInfo::Downloading && local_.count(f.hash)==0 && remote_.count(f.hash)==0) 
 	downloading_.insert(make_pair(f.hash, f));
   else if (f.type == FInfo::Remote && local_.count(f.hash)==0 && downloading_.count(f.hash)==0) 
-	//如果此文件已经在local_或者downloading_中存在则抛出InfoExists抛弃此FInfo
 	remote_.insert(make_pair(f.hash, f));
-  else
-	throw InfoTypeError();
+  throw InfoExists();
 }
 
 
-void FInfoManager::del_info(const Hash& h)
+FInfo FInfoManager::del_info(const Hash& h)
 {
-  local_.erase(h);
-  downloading_.erase(h);
-  remote_.erase(h);
+  auto it = local_.find(h);
+  if (it != local_.end()) {
+	  FInfo tmp = it->second;
+	  local_.erase(it);
+	  return tmp;
+  }
+  if (it != downloading_.end()) {
+	  FInfo tmp = it->second;
+	  local_.erase(it);
+	  return tmp;
+  }
+  if (it != remote_.end()) {
+	  FInfo tmp = it->second;
+	  local_.erase(it);
+	  return tmp;
+  }
+  throw InfoNotFound();
 }
 
 const FInfo& FInfoManager::find(const Hash& h)

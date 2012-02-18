@@ -15,7 +15,7 @@ public:
 		T t = *(T*)(data_+pos_);
 		pos_ += sizeof(T);
 		assert(pos_ <= max_size_);
-		cout << "T:" << t << " size:" << sizeof(T) << "\n";
+		//cout << "T:" << t << " size:" << sizeof(T) << "\n";
 		return t;
 	}
   string str(int size) {
@@ -163,11 +163,11 @@ Transport::Transport(FInfoManager& info_manager)
 {
   //注册相关消息
   ndriver_.register_plugin(NetDriver::INFO, "FILEINFO", [&](const char*data, size_t s){
-						   FInfo info = info_from_net(data, s);
 						   try {
-						   		info_manager_.add_info(info);
-						   		on_new_file(info);
-						   } catch(...) { }
+						   FInfo info = info_from_net(data, s);
+						   info_manager_.add_info(info);
+						   on_new_file(info);
+						   } catch (...) {}
 						   });
   ndriver_.register_plugin(NetDriver::DATA, "CHUNK", [&](const char*data, size_t s){
 						   handle_chunk(chunk_from_net(data, s));

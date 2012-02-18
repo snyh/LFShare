@@ -13,12 +13,17 @@ FileManager::FileManager()
 void FileManager::add_local_file(const string& path)
 {
   FInfo info = info_manager_.add_info(path);
+  cb_new_file(info);
   transport_.add_completed_file(info.hash);
 }
 
 void FileManager::remove(const Hash& h)
 {
-  info_manager_.del_info(h);
+  FInfo info = info_manager_.del_info(h);
+  if (info.type == FInfo::Local)
+	transport_.del_completed_file(h);
+  else if (info.type == FInfo::Downloading)
+	transport_.stop_receive(h);
 }
 
 vector<FInfo> FileManager::current_list()
@@ -39,6 +44,7 @@ void FileManager::stop_download(const Hash& h)
 
 void FileManager::cb_new_file(const FInfo& info)
 {
+  assert("newFile");
   msg_.new_files.push_back(info);
 }
 

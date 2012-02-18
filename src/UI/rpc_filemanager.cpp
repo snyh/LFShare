@@ -8,6 +8,8 @@ typedef const JRPC::JSON MP;
 
 string hash2str(const Hash& h)
 {
+  if (h.size() != 16)
+	throw HashInvalid();
   char buf[33];
   for (int i=0; i<16; i++) {
 	  snprintf(buf+i*2, 3, "%02x", (unsigned char)h[i]);
@@ -16,11 +18,15 @@ string hash2str(const Hash& h)
 }
 Hash str2hash(const string& s)
 {
-  Hash hash(16, ' ');
-  for (int i=0; i<32; i+=2) {
-	  hash[i/2] = stoi(s.substr(i, 2), 0, 16);
+  try {
+	  Hash hash(16, ' ');
+	  for (int i=0; i<32; i+=2) {
+		  hash[i/2] = stoi(s.substr(i, 2), 0, 16);
+	  }
+	  return hash;
+  } catch (...) {
+	  throw HashInvalid(s);
   }
-  return hash;
 }
 
 MP info2json(const FInfo& info)
@@ -28,6 +34,7 @@ MP info2json(const FInfo& info)
   JRPC::JSON node;
   node["hash"] = hash2str(info.hash);
   node["name"] = fs::path(info.path).filename().string();
+  assert(info.chunknum > 0);
   node["size"] = (info.chunknum-1) * FInfo::chunksize + info.lastchunksize;
   node["status"] = info.type;
 
@@ -38,7 +45,7 @@ MP info2json(const FInfo& info)
 
 MP msg2json(const NewMsg& msg)
 {
-  JRPC::JSON result; result["newfile"]; result["payload"]; result["pfile"]; result["progress"];
+  JRPC::JSON result; result["newfile"]; result["pfile"]; result["progress"];
   for (auto& file: msg.new_files) {
 	  result["newfile"].append(info2json(file));
   }
@@ -79,8 +86,20 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 				  return JRPC::JSON("添加文件成功");
 			  } catch (InfoExists&) {
 				  return JRPC::JSON("已经存在此文件"); 
-			  } catch (...) {
-				  return JRPC::JSON("未知错误"); 
+			  } catch (std::exception& e){
+				  return JRPC::JSON(string("未知错误")+e.what()); 
+			  }
+		  }
+		},
+		{
+		  "del_file", [&](MP& j){
+			  try {
+				  theMFM.remove(str2hash(j["hash"].asString()));
+				  return JRPC::JSON("成功删除");
+			  } catch (InfoNotFound&) {
+				  return JRPC::JSON("所删除文件不存在");
+			  } catch (HashInvalid& e) {
+				  return JRPC::JSON(string("所删除文件哈希无效:") + e.what());
 			  }
 		  }
 		},
@@ -89,7 +108,7 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 			  NewMsg msg = theMFM.refresh();
 			  return msg2json(msg);
 		  }
-		}
+		},
   };
   return filemanager;
 }

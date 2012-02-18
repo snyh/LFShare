@@ -14,11 +14,10 @@ public:
 		tmp_.push_back(s);
 		asio_.push_back(boost::asio::buffer(tmp_[tmp_.size()-1]));
 	}
-	template<typename T>
-	  void add_val(T t, size_t s) {
+	void add_val(void* t, size_t s) {
 		  tmp_.push_back(std::string((char*)t, s));
 		  asio_.push_back(boost::asio::buffer(tmp_[tmp_.size()-1]));
-	  }
+	}
 	void add_ref(const char*data, size_t s) {
 		asio_.push_back(boost::asio::buffer(data, s));
 	}

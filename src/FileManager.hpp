@@ -7,6 +7,8 @@
 #include <map>
 #include <string>
 
+class Transport;
+
 struct NewMsg {
 	Payload payload;
 	std::map<Hash, double> progress;
@@ -35,6 +37,8 @@ public:
   //从当前以及文件信息中删除此某一文件信息
   void remove(const Hash& h);
 
+  //开启网络传输模块
+  void network_start();
 
 private:
   void cb_new_file(const FInfo&);

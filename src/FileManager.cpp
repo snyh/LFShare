@@ -54,3 +54,8 @@ NewMsg FileManager::refresh()
   msg_ = NewMsg();
   return old;
 }
+
+void FileManager::network_start()
+{
+  transport_.run();
+}

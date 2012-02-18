@@ -8,21 +8,21 @@ set(CMAKE_CXX_FLAGS "-std=c++0x")
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
 add_executable(tmp 
-	src/MFileManager.cpp 
-	src/MFile.cpp
-	src/main.cpp
+	src/FInfo.cpp
 	src/NetDriver.cpp
-	src/Connector.cpp
+	src/Transport.cpp
+	src/FileManager.cpp
+	src/main.cpp
 
-	src/rpc_filemanager.cpp
-	src/rpc_systeminfo.cpp
+	src/UI/rpc_filemanager.cpp
+	src/UI/rpc_systeminfo.cpp
 
-	src/AppWebServer/content.cpp
-	src/AppWebServer/jrpc.cpp
-	src/AppWebServer/request_response.cpp
-	src/AppWebServer/server.cpp
-	src/AppWebServer/session.cpp
+	src/UI/AppWebServer/content.cpp
+	src/UI/AppWebServer/jrpc.cpp
+	src/UI/AppWebServer/request_response.cpp
+	src/UI/AppWebServer/server.cpp
+	src/UI/AppWebServer/session.cpp
 	)
 target_link_libraries(tmp ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} pthread crypto jsoncpp)
 
-add_subdirectory(test)
+#add_subdirectory(test)

@@ -14,16 +14,18 @@ public:
 	T read() {
 		T t = *(T*)(data_+pos_);
 		pos_ += sizeof(T);
+		assert(pos_ <= max_size_);
+		cout << "T:" << t << " size:" << sizeof(T) << "\n";
 		return t;
 	}
   string str(int size) {
 	  string str(data_+pos_, size);
 	  pos_ += size;
-	  //if (pos_ > max_size_)
+	  assert(pos_ <= max_size_);
 	  return str;
   }
   string str() {
-	  int s = this->read<int>();
+	  size_t s = this->read<size_t>();
 	  return str(s);
   }
   const char* data() { return data_ + pos_; }
@@ -34,13 +36,22 @@ private:
   size_t max_size_;
 };
 
+string hash2str(Hash h);
 FInfo info_from_net(const char* data, size_t s)
 {
-  ByteReader r(data, s);
+  /*
+  千万不要这样来构造INFO, 因为求参顺序是不确定的.
   FInfo info(r.str(16), //file_hash
 			 r.str(), //file_path
-			 r.read<int>(), //chunknum
-			 r.read<size_t>()); //lastchunksize
+			 r.read<uint32_t>(), //chunknum
+			 r.read<uint32_t>()); //lastchunksize
+  */
+  ByteReader r(data, s);
+  FInfo info;
+  info.hash = r.str(16);
+  info.path = r.str();
+  info.chunknum = r.read<uint32_t>();
+  info.lastchunksize = r.read<uint32_t>();
   info.type = FInfo::Remote;
   return info;
 }
@@ -50,7 +61,12 @@ NetBufPtr info_to_net(FInfo& info)
   NetBufPtr buf(new NetBuf);
   buf->add_val("FILEINFO\n");
   buf->add_val(info.hash);
-  buf->add_val(filesystem::basename(info.path));
+
+  string name = boost::filesystem::path(info.path).filename().string();
+  uint32_t s = name.size();
+  buf->add_val(&s, sizeof(uint32_t));
+  buf->add_val(name);
+
   buf->add_val(&(info.chunknum), sizeof(int));
   buf->add_val(&(info.lastchunksize), sizeof(size_t));
   return buf;
@@ -60,7 +76,7 @@ NetBufPtr info_to_net(FInfo& info)
 //可以通过Chunk来组装完整的文件。
 //Chunk本身不动态分配内存,因此Chunk体积较小,大概占用40byte的内存(32位系统)，
 struct Chunk {
-	Chunk(Hash fh, int i, size_t s, const char* d) 
+	Chunk(Hash fh, uint32_t i, uint32_t s, const char* d) 
 	  : file_hash(fh),
 	  chunk_hash(d, s),
 	  index(i),
@@ -68,7 +84,7 @@ struct Chunk {
 	  data(d),
 	  is_valid_(true) {
 	  }
-	Chunk(Hash fh, Hash h, int i, size_t s, const char* d) 
+	Chunk(Hash fh, Hash h, uint32_t i, uint32_t s, const char* d) 
 	  : file_hash(fh),
 	  chunk_hash(h),
 	  index(i),
@@ -83,8 +99,8 @@ struct Chunk {
 	bool valid() const { return is_valid_; }
 	Hash file_hash;
 	Hash chunk_hash;
-	int index;
-	int size;
+	uint32_t index;
+	uint32_t size;
 	const char* data;
 private:
 	bool is_valid_;
@@ -95,8 +111,8 @@ Chunk chunk_from_net(const char* data, size_t s)
   ByteReader r(data, s);
   Chunk c(r.str(16), //file_hash
 		  r.str(16), //chunk_hash
-		  r.read<int>(), //index
-		  r.read<size_t>(), //size
+		  r.read<uint32_t>(), //index
+		  r.read<uint32_t>(), //size
 		  r.data()); //data pointer
   return c;
 }
@@ -106,8 +122,8 @@ NetBufPtr chunk_to_net(Chunk& c)
   buf->add_val("CHUNK\n");
   buf->add_val(c.file_hash);
   buf->add_val(c.chunk_hash);
-  buf->add_val(&(c.index), sizeof(int));
-  buf->add_val(&(c.size), sizeof(size_t));
+  buf->add_val(&(c.index), sizeof(uint32_t));
+  buf->add_val(&(c.size), sizeof(uint32_t));
   buf->add_ref(c.data, c.size);
   return buf;
 }
@@ -148,8 +164,10 @@ Transport::Transport(FInfoManager& info_manager)
   //注册相关消息
   ndriver_.register_plugin(NetDriver::INFO, "FILEINFO", [&](const char*data, size_t s){
 						   FInfo info = info_from_net(data, s);
-						   info_manager_.add_info(info);
-						   on_new_file(info);
+						   try {
+						   		info_manager_.add_info(info);
+						   		on_new_file(info);
+						   } catch(...) { }
 						   });
   ndriver_.register_plugin(NetDriver::DATA, "CHUNK", [&](const char*data, size_t s){
 						   handle_chunk(chunk_from_net(data, s));
@@ -207,9 +225,9 @@ void Transport::handle_chunk(const Chunk& c)
 	  }
 
 	  //如果是全局缺少的文件块则取消文件块缺失标记
-	  auto& it = global_bill_.find(c.file_hash);
+	  auto it = global_bill_.find(c.file_hash);
 	  if (it != global_bill_.end() && it->second[c.index]){
-			it->second[c.index] = false;
+		  it->second[c.index] = false;
 	  }
   }
 }
@@ -249,10 +267,10 @@ void Transport::send_chunks()
   //生成不多于5个文件块
   vector<Chunk> chunks;
   for (auto& bill : global_bill_) {
-	  send_chunk_helper(chunks, bill.first, bill.second, native_, completed_, global_bill_);
+	  send_chunk_helper(chunks, bill.first, bill.second, completed_, native_, global_bill_);
 	  if (chunks.size() > 5)
 		break;
-	  send_chunk_helper(chunks, bill.first, bill.second, native_, downloading_, global_bill_);
+	  send_chunk_helper(chunks, bill.first, bill.second, downloading_, native_, global_bill_);
   }
 
   //发送文件块数据到网络
@@ -345,7 +363,7 @@ void NativeFileManager::new_file(const FInfo& info)
 void NativeFileManager::push_hot(const Hash& h)
 {
   using namespace boost::iostreams;
-  FInfo& info = files_.find(h).second;
+  FInfo& info = files_.find(h)->second;
 
   if (info.type == FInfo::Local) {
 	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readonly)));
@@ -357,7 +375,7 @@ void NativeFileManager::push_hot(const Hash& h)
 
 	  hot_.push_front(make_pair(info.hash, mapped_file(param)));
   } else if (info.type == FInfo::Downloading) {
-	  files_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
+	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
   }
 }
 
@@ -373,18 +391,18 @@ void NativeFileManager::set_current_file(const Hash& h)
   }
 
   //如果此文件在hot列表中则将其位置提前，以便下次可以直接命中
-  auto& hot_it = hot_.begin();
+  auto hot_it = hot_.begin();
   for (; hot_it != hot_.end(); hot_it++) {
 	  if (hot_it->first == h) {
-		hot_.erase(hot_it);
-		push_hot(h);
+		  hot_.erase(hot_it);
+		  push_hot(h);
 	  }
   }
 
   //如果此文件不在hot列表则将其加入hot中，并将hot中最后的文件关闭
   if (hot_it == hot_.end()) {
 	  push_hot(h);
-	  hot_.back()->second.close();
+	  hot_.back().second.close();
 	  hot_.pop_back();
   }
 
@@ -392,14 +410,14 @@ void NativeFileManager::set_current_file(const Hash& h)
   current_= hot_.front().second.data();
 }
 
-void NativeFileManager::write(const Hash& h, long begin, const char* data, size_t s)
+void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t s)
 {
   set_current_file(h);
-  memcpy(data, current_+begin, s);
+  memcpy(current_+begin, src, s);
 }
 
-void NativeFileManager::read(const Hash& h, long begin, char* data, size_t s)
+void NativeFileManager::read(const Hash& h, long begin, char* dest, size_t s)
 {
   set_current_file(h);
-  memcpy(current_+begin, data, s);
+  memcpy(dest, current_+begin, s);
 }

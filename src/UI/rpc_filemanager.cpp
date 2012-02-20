@@ -94,7 +94,6 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "del_file", [&](MP& j){
 			  try {
-				  cout << "请求删除:"  << j << endl;
 				  theMFM.remove(str2hash(j["hash"].asString()));
 				  return JRPC::JSON("成功删除");
 			  } catch (InfoNotFound&) {
@@ -107,7 +106,6 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "download", [&](MP& j){
 			  try {
-				  cout << "请求下载:"  << j << endl;
 				  theMFM.start_download(str2hash(j["hash"].asString()));
 				  return JRPC::JSON("下载请求提交成功");
 			  } catch (InfoNotFound&) {

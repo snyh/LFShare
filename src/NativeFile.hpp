@@ -10,7 +10,7 @@ typedef std::string Hash;
 
 class NativeFileManager {
 public:
-	NativeFileManager(int n): max_num_(n) {}
+	NativeFileManager(int n): current_(nullptr), max_num_(n) {}
 	void new_file(const FInfo&);
 	void write(const Hash& h, long begin, const char* data, size_t s);
 	void read(const Hash& h, long begin, char* data, size_t s);

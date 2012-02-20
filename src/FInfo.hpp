@@ -30,7 +30,7 @@ struct FInfo {
 	std::string path;
 	Hash hash;
 	uint32_t chunknum;
-	static const uint32_t chunksize = 65536;
+	static const uint32_t chunksize = 60000;
 	uint32_t lastchunksize;
 	enum Type { Local, Downloading, Remote} type;
 

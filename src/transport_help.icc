@@ -6,14 +6,15 @@ public:
 	T read() {
 		T t = *(T*)(data_+pos_);
 		pos_ += sizeof(T);
-		assert(pos_ <= max_size_);
+		if (pos_ > max_size_)
+		  throw IllegalData();
 		return t;
 	}
   string str(uint32_t size) {
 	  string str(data_+pos_, size);
 	  pos_ += size;
-	  //cout << "pos_: " << pos_ << " max_size: " << max_size_ << endl;
-	  assert(pos_ <= max_size_);
+	  if (pos_ > max_size_)
+		throw IllegalData();
 	  return str;
   }
   string str() {
@@ -43,6 +44,8 @@ FInfo info_from_net(const char* data, size_t s)
   info.path = r.str();
   info.chunknum = r.read<uint32_t>();
   info.lastchunksize = r.read<uint32_t>();
+  if (info.lastchunksize > FInfo::chunksize)
+	throw IllegalData();
   info.type = FInfo::Remote;
   return info;
 }
@@ -71,52 +74,54 @@ NetBufPtr info_to_net(const FInfo& info)
 struct Chunk {
 	Chunk(Hash fh, uint32_t i, uint32_t s, const char* d) 
 	  : file_hash(fh),
-	  chunk_hash(d, s),
+	  chunk_hash(hash_data(d,s)),
 	  index(i),
 	  size(s),
-	  data(d),
-	  is_valid_(true) {
-	  }
+	  data(d) {}
 	Chunk(Hash fh, Hash h, uint32_t i, uint32_t s, const char* d) 
 	  : file_hash(fh),
 	  chunk_hash(h),
 	  index(i),
 	  size(s),
 	  data(d) {
-		  if (chunk_hash == hash_data(data, size))
-			is_valid_ = true;
-		  else
-			is_valid_ = false;
+		  if (chunk_hash != hash_data(data, size))
+			throw IllegalData();
 	  }
 
-	bool valid() const { return is_valid_; }
 	Hash file_hash;
 	Hash chunk_hash;
 	uint32_t index;
 	uint32_t size;
 	const char* data;
-private:
-	bool is_valid_;
 };
 
-Chunk chunk_from_net(const char* data, size_t s)
+Chunk chunk_from_net(const char* data, size_t size)
 {
-  ByteReader r(data, s);
-  Chunk c(r.str(16), //file_hash
-		  r.str(16), //chunk_hash
-		  r.read<uint32_t>(), //index
-		  r.read<uint32_t>(), //size
-		  r.data()); //data pointer
+  ByteReader r(data, size);
+  Hash f_h = r.str(16);
+  Hash c_h = r.str(16);
+  uint32_t i = r.read<uint32_t>();
+  uint32_t s = r.read<uint32_t>();
+  const char* d = r.data();
+  if (s > FInfo::chunksize)
+	throw IllegalData();
+  Chunk c(f_h, c_h, i, s, d);
   return c;
 }
-NetBufPtr chunk_to_net(Chunk& c)
+NetBufPtr chunk_to_net(const Chunk& c)
 {
+  uint32_t s;
   NetBufPtr buf(new NetBuf);
   buf->add_val("CHUNK\n");
   buf->add_val(c.file_hash);
   buf->add_val(c.chunk_hash);
-  buf->add_val(&(c.index), sizeof(uint32_t));
-  buf->add_val(&(c.size), sizeof(uint32_t));
+
+  s = c.index;
+  buf->add_val(&s, sizeof(uint32_t));
+
+  s = c.size;
+  buf->add_val(&s, sizeof(uint32_t));
+
   buf->add_ref(c.data, c.size);
   return buf;
 }

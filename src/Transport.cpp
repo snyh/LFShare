@@ -7,6 +7,9 @@
 using namespace std;
 namespace pl = std::placeholders;
 
+class IllegalData : public std::exception {
+};
+
 #include "transport_help.icc"
 
 Transport::Transport(FInfoManager& info_manager)
@@ -16,13 +19,16 @@ Transport::Transport(FInfoManager& info_manager)
 {
   //注册相关消息
   ndriver_.register_plugin(NetDriver::INFO, "FILEINFO", [&](const char*data, size_t s){
-						   handle_info(info_from_net(data, s));
+						   try { handle_info(info_from_net(data, s)); }
+						   catch (IllegalData&) {assert(!"IllegalData");}
 						   });
   ndriver_.register_plugin(NetDriver::DATA, "CHUNK", [&](const char*data, size_t s){
-						   handle_chunk(chunk_from_net(data, s));
+						   try {handle_chunk(chunk_from_net(data, s)); }
+						   catch(IllegalData&) {assert(!"IllegalData");}
 						   });
   ndriver_.register_plugin(NetDriver::INFO, "BILL", [&](const char*data, size_t s){
-						   handle_bill(bill_from_net(data, s));
+						   try {handle_bill(bill_from_net(data, s));}
+						   catch(IllegalData&) {assert(!"IllegalData");}
 						   });
   //注册定时器以便统计速度
   ndriver_.start_timer(1, bind(&Transport::record_speed, this));
@@ -59,7 +65,6 @@ void Transport::handle_info(const FInfo& info)
 {
   try {
 	  info_manager_.add_info(info);
-	  cout << "发现新文件:"<<info.path << endl;
 	  on_new_file(info);
   } catch (InfoExists&) {
 	  cout << "文件已存在:" <<  info.path << endl;
@@ -71,13 +76,12 @@ void Transport::send_bill()
   //TODO:一次是否发送太多文件块请求？
   for (auto& t: local_bill_) {
 	  Bill bill{t.first, t.second};
-	  //cout << "开始发送:" << hash2str(t.first) << endl;
-	  cout << "--------:" << t.second << endl;
 	  ndriver_.info_send(bill_to_net(bill));
   }
 }
 void Transport::handle_bill(const Bill& b)
 {
+  return;
   //如果所请求文件本地拥有完整拷贝则全部添加到global_bill中
   if (complete_.count(b.hash)) {
 	  global_bill_[b.hash] |= b.bits;
@@ -89,9 +93,6 @@ void Transport::handle_bill(const Bill& b)
   if (incomplete_.count(b.hash)) {
 	  //tmp保存的是b.bits所缺少而本地拥有的文件块位。
 	  auto tmp = ~local_bill_[b.hash] & b.bits;
-	  cout << "所请求块: " << b.bits << endl;
-	  cout << "本地拥有: " << ~local_bill_[b.hash] << endl;
-	  cout << "综合可发送: " << tmp << endl;
 	  //只有拥有对方所缺少的文件块则进行标记
 	  if (tmp.any()) {
 		  global_bill_[b.hash] |= tmp;
@@ -102,38 +103,38 @@ void Transport::handle_bill(const Bill& b)
 }
 
 
+string hash2str(const Hash&);
 void Transport::handle_chunk(const Chunk& c)
 {
-  if (c.valid()) {
-	  payload_.global++;
+  payload_.global++;
 
-	  //如果是下载队列中的文件
-	  if (incomplete_.count(c.file_hash)) {
+  //如果是下载队列中的文件
+  if (incomplete_.count(c.file_hash)) {
+	  cout << "进入incomplete" << endl;
 
-		  //并且是此文件所缺少的文件块
-		  auto it = local_bill_.find(c.file_hash);
-		  if (it != local_bill_.end() && it->second[c.index]) {
-			  //就取消文件块缺失标记
-			  it->second[c.index] = false;
-			  //并写入文件
-			  native_.write(c.file_hash, c.index*FInfo::chunksize, c.data, c.size);
-
-			  //检查是否已经完成
-			  check_complete(c.file_hash);
-
-			  //同时记录此文件有效获得一次文件块以便统计下载速度
-			  payload_.files[c.file_hash]++;
-
-			  //继续发送Bill以便其他节点可以马上继续发送文件块
-			  ndriver_.add_task(100, bind(&Transport::send_bill, this));
-		  } 
-	  }
-
-	  //如果是全局缺少的文件块则取消文件块缺失标记
-	  auto it = global_bill_.find(c.file_hash);
-	  if (it != global_bill_.end() && it->second[c.index]){
+	  //并且是此文件所缺少的文件块
+	  auto it = local_bill_.find(c.file_hash);
+	  if (it != local_bill_.end() && it->second[c.index]) {
+		  //就取消文件块缺失标记
 		  it->second[c.index] = false;
-	  }
+		  //并写入文件
+		  native_.write(c.file_hash, c.index*FInfo::chunksize, c.data, c.size);
+
+		  //检查是否已经完成
+		  check_complete(c.file_hash);
+
+		  //同时记录此文件有效获得一次文件块以便统计下载速度
+		  payload_.files[c.file_hash]++;
+
+		  //继续发送Bill以便其他节点可以马上继续发送文件块
+		  ndriver_.add_task(100, bind(&Transport::send_bill, this));
+	  } 
+  }
+
+  //如果是全局缺少的文件块则取消文件块缺失标记
+  auto it = global_bill_.find(c.file_hash);
+  if (it != global_bill_.end() && it->second[c.index]){
+	  it->second[c.index] = false;
   }
 }
 void send_chunk_helper(vector<Chunk>& chunks,

@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <boost/signals2/signal.hpp>
 
 class InfoNotFound : public std::exception {
 };
@@ -76,13 +77,12 @@ public:
 	 * @return 
 	 */
 	const FInfo& find(const Hash& h);
-	const FInfo& find(const Hash& h, FInfo::Type);
 	std::vector<FInfo> list();
-	std::vector<FInfo> list(FInfo::Type);
+
+	boost::signals2::signal<void(const FInfo&)> on_new_info;
+	boost::signals2::signal<void(const Hash&)> on_del_info;
 private:
-	std::map<Hash, FInfo> local_;
-	std::map<Hash, FInfo> remote_;
-	std::map<Hash, FInfo> downloading_;
+	std::map<Hash, FInfo> all_info_;
 };
 
 #endif

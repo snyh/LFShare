@@ -94,12 +94,26 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "del_file", [&](MP& j){
 			  try {
+				  cout << "请求删除:"  << j << endl;
 				  theMFM.remove(str2hash(j["hash"].asString()));
 				  return JRPC::JSON("成功删除");
 			  } catch (InfoNotFound&) {
 				  return JRPC::JSON("所删除文件不存在");
 			  } catch (HashInvalid& e) {
 				  return JRPC::JSON(string("所删除文件哈希无效:") + e.what());
+			  }
+		  }
+		},
+		{
+		  "download", [&](MP& j){
+			  try {
+				  cout << "请求下载:"  << j << endl;
+				  theMFM.start_download(str2hash(j["hash"].asString()));
+				  return JRPC::JSON("下载请求提交成功");
+			  } catch (InfoNotFound&) {
+				  return JRPC::JSON("文件不存在");
+			  } catch (HashInvalid& e) {
+				  return JRPC::JSON(string("文件哈希无效:") + e.what());
 			  }
 		  }
 		},

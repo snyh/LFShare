@@ -39,7 +39,7 @@ FInfo FInfoManager::add_info(const std::string& path)
 
 		FInfo info(path, hash, chunknum, lastchunksize);
 		info.type = FInfo::Local;
-		local_.insert(make_pair(info.hash, info));
+		this->add_info(info);
 		return info;
 	}
 }
@@ -47,97 +47,42 @@ FInfo FInfoManager::add_info(const std::string& path)
 
 void FInfoManager::add_info(const FInfo& f)
 {
-  if (f.type == FInfo::Local && downloading_.count(f.hash)==0 && remote_.count(f.hash)==0)
-	local_.insert(make_pair(f.hash, f));
-  else if (f.type == FInfo::Downloading && local_.count(f.hash)==0 && remote_.count(f.hash)==0) 
-	downloading_.insert(make_pair(f.hash, f));
-  else if (f.type == FInfo::Remote && local_.count(f.hash)==0 && downloading_.count(f.hash)==0) 
-	remote_.insert(make_pair(f.hash, f));
-  throw InfoExists();
+  if (all_info_.count(f.hash) != 0)
+	throw InfoExists();
+
+  all_info_.insert(make_pair(f.hash, f));
+
+  on_new_info(f);
 }
 
 
 FInfo FInfoManager::del_info(const Hash& h)
 {
-  auto it = local_.find(h);
-  if (it != local_.end()) {
-	  FInfo tmp = it->second;
-	  local_.erase(it);
-	  return tmp;
-  }
-  if (it != downloading_.end()) {
-	  FInfo tmp = it->second;
-	  local_.erase(it);
-	  return tmp;
-  }
-  if (it != remote_.end()) {
-	  FInfo tmp = it->second;
-	  local_.erase(it);
-	  return tmp;
-  }
-  throw InfoNotFound();
+  auto it = all_info_.find(h);
+  if (it == all_info_.end())
+	throw InfoNotFound();
+
+  FInfo tmp = it->second;
+  all_info_.erase(it);
+
+  on_del_info(h);
+  return tmp;
 }
 
 const FInfo& FInfoManager::find(const Hash& h)
 {
-  auto it = local_.find(h);
-  if (it != local_.end())
-	return it->second;
+  auto it = all_info_.find(h);
+  if (it == all_info_.end())
+	throw InfoNotFound();
 
-  it = downloading_.find(h);
-  if (it != downloading_.end())
-	return it->second;
-
-  it = remote_.find(h);
-  if (it != remote_.end())
-	return it->second;
-
-  throw InfoNotFound();
-}
-
-const FInfo& FInfoManager::find(const Hash& h, FInfo::Type type)
-{
-  std::map<Hash, FInfo>::iterator it;
-  if (type == FInfo::Local)
-	it = local_.find(h);
-  else if (type == FInfo::Downloading)
-	it = downloading_.find(h);
-  else if (type == FInfo::Remote)
-	it = remote_.find(h);
-
-  if (it != map<Hash, FInfo>::iterator())
-	return it->second;
-
-  throw InfoNotFound();
+  return it->second;
 }
 
 std::vector<FInfo> FInfoManager::list()
 {
   vector<FInfo> v;
-  for (auto& t: local_) {
+  for (auto& t: all_info_) {
 	  v.push_back(t.second);
-  }
-  for (auto& t: downloading_) {
-	  v.push_back(t.second);
-  }
-  for (auto& t: remote_) {
-	  v.push_back(t.second);
-  }
-  return v;
-}
-
-std::vector<FInfo> FInfoManager::list(FInfo::Type type)
-{
-  vector<FInfo> v;
-  if (type == FInfo::Local) {
-	  for (auto& t: local_)
-		v.push_back(t.second);
-  } else if (type == FInfo::Downloading) {
-	  for (auto& t: downloading_)
-		v.push_back(t.second);
-  } else if (type == FInfo::Remote) {
-	  for (auto& t: remote_)
-		v.push_back(t.second);
   }
   return v;
 }

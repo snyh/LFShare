@@ -104,7 +104,7 @@ public:
   void add_task(int priority, std::function<void()> cb);
 
 private:
-  typedef std::multimap<std::string, ReceiveFunction> CBS;
+  typedef std::map<std::string, ReceiveFunction> CBS;
   void handle_receive(CBS& cbs, const char* data, size_t s);
 
   void receive_info(const boost::system::error_code& ec, size_t byte_transferred);
@@ -120,7 +120,7 @@ private:
 
   boost::asio::ip::udp::socket ssend_;
 
-  std::array<char, 1024> ibuf_;
+  std::array<char, 10240> ibuf_;
   std::array<char, 4+16+65536> dbuf_;
 
   CBS cb_info_;

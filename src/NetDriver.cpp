@@ -91,9 +91,9 @@ void NetDriver::handle_receive(CBS& cbs, const char* data, size_t s)
 	return;
   string key(data, pos);
 
-  for(auto it = cbs.find(key); it != cbs.end(); it++) {
-	  it->second(data+pos+1, s-pos-1);
-  }
+  auto it = cbs.find(key);
+  if (it != cbs.end())
+	it->second(data+pos+1, s-pos-1);
 }
 
 void NetDriver::timer_helper(TimerPtr timer, int s, std::function<void()> cb)

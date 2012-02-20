@@ -3,11 +3,11 @@
 #include <string>
 #include <map>
 #include <set>
-#include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/signals2/signal.hpp>
 #include "NetDriver.hpp"
 #include "FInfo.hpp"
+#include "NativeFile.hpp"
 
 typedef std::string Hash;
 class FInfoManager;
@@ -18,22 +18,6 @@ struct Payload {
 	int global;
 	std::map<Hash, int> files;
 };
-
-class NativeFileManager {
-public:
-	NativeFileManager(int n): max_num_(n) {}
-	void new_file(const FInfo&);
-	void write(const Hash& h, long begin, const char* data, size_t s);
-	void read(const Hash& h, long begin, char* data, size_t s);
-private:
-	void set_current_file(const Hash& h);
-	void push_hot(const Hash& h);
-	std::list<std::pair<Hash, boost::iostreams::mapped_file> > hot_;
-	std::map<Hash, FInfo> files_;
-	char* current_;
-	int max_num_;
-};
-
 class Transport {
 public:
   	Transport(FInfoManager& info_manager);

@@ -16,6 +16,7 @@ add_executable(server
 	src/NetDriver.cpp
 	src/Transport.cpp
 	src/FileManager.cpp
+	src/NativeFile.cpp
 	src/main.cpp
 
 	src/UI/rpc_filemanager.cpp

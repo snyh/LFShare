@@ -1,0 +1,152 @@
+class ByteReader {
+public:
+  ByteReader(const char* data, uint32_t s)
+	: pos_(0), data_(data), max_size_(s) {}
+  template<typename T>
+	T read() {
+		T t = *(T*)(data_+pos_);
+		pos_ += sizeof(T);
+		assert(pos_ <= max_size_);
+		return t;
+	}
+  string str(uint32_t size) {
+	  string str(data_+pos_, size);
+	  pos_ += size;
+	  //cout << "pos_: " << pos_ << " max_size: " << max_size_ << endl;
+	  assert(pos_ <= max_size_);
+	  return str;
+  }
+  string str() {
+	  uint32_t s = this->read<uint32_t>();
+	  return str(s);
+  }
+  const char* data() { return data_ + pos_; }
+
+private:
+  uint32_t pos_;
+  const char* data_;
+  uint32_t max_size_;
+};
+
+FInfo info_from_net(const char* data, size_t s)
+{
+  /*
+  千万不要这样来构造INFO, 因为求参顺序是不确定的.
+  FInfo info(r.str(16), //file_hash
+			 r.str(), //file_path
+			 r.read<uint32_t>(), //chunknum
+			 r.read<uint32_t>()); //lastchunksize
+  */
+  ByteReader r(data, s);
+  FInfo info;
+  info.hash = r.str(16);
+  info.path = r.str();
+  info.chunknum = r.read<uint32_t>();
+  info.lastchunksize = r.read<uint32_t>();
+  info.type = FInfo::Remote;
+  return info;
+}
+
+NetBufPtr info_to_net(const FInfo& info)
+{
+  NetBufPtr buf(new NetBuf);
+  buf->add_val("FILEINFO\n");
+  buf->add_val(info.hash);
+
+  string name = boost::filesystem::path(info.path).filename().string();
+  uint32_t s = name.size();
+  buf->add_val(&s, sizeof(uint32_t));
+  buf->add_val(name);
+
+  s = info.chunknum;
+  buf->add_val(&(s), sizeof(uint32_t));
+  s = info.lastchunksize;
+  buf->add_val(&(s), sizeof(uint32_t));
+  return buf;
+}
+
+//Chunk用来包装一块数据(当前默认大小64KB)，可以在网络上进行安全的传输
+//可以通过Chunk来组装完整的文件。
+//Chunk本身不动态分配内存,因此Chunk体积较小,大概占用40byte的内存(32位系统)，
+struct Chunk {
+	Chunk(Hash fh, uint32_t i, uint32_t s, const char* d) 
+	  : file_hash(fh),
+	  chunk_hash(d, s),
+	  index(i),
+	  size(s),
+	  data(d),
+	  is_valid_(true) {
+	  }
+	Chunk(Hash fh, Hash h, uint32_t i, uint32_t s, const char* d) 
+	  : file_hash(fh),
+	  chunk_hash(h),
+	  index(i),
+	  size(s),
+	  data(d) {
+		  if (chunk_hash == hash_data(data, size))
+			is_valid_ = true;
+		  else
+			is_valid_ = false;
+	  }
+
+	bool valid() const { return is_valid_; }
+	Hash file_hash;
+	Hash chunk_hash;
+	uint32_t index;
+	uint32_t size;
+	const char* data;
+private:
+	bool is_valid_;
+};
+
+Chunk chunk_from_net(const char* data, size_t s)
+{
+  ByteReader r(data, s);
+  Chunk c(r.str(16), //file_hash
+		  r.str(16), //chunk_hash
+		  r.read<uint32_t>(), //index
+		  r.read<uint32_t>(), //size
+		  r.data()); //data pointer
+  return c;
+}
+NetBufPtr chunk_to_net(Chunk& c)
+{
+  NetBufPtr buf(new NetBuf);
+  buf->add_val("CHUNK\n");
+  buf->add_val(c.file_hash);
+  buf->add_val(c.chunk_hash);
+  buf->add_val(&(c.index), sizeof(uint32_t));
+  buf->add_val(&(c.size), sizeof(uint32_t));
+  buf->add_ref(c.data, c.size);
+  return buf;
+}
+
+struct Bill {
+	Hash hash;
+	boost::dynamic_bitset<> bits;
+};
+
+Bill bill_from_net(const char* data, size_t s)
+{
+  ByteReader r(data, s);
+  Bill bill;
+  bill.hash = r.str(16);
+  bill.bits = boost::dynamic_bitset<>(r.str());
+  return bill;
+}
+
+NetBufPtr bill_to_net(Bill& b)
+{
+  assert(b.hash.size() == 16);
+  NetBufPtr buf(new NetBuf);
+  buf->add_val("BILL\n");
+  buf->add_val(b.hash);
+
+  string b_str;
+  to_string(b.bits, b_str);
+  uint32_t s = b_str.size();
+
+  buf->add_val(&s, sizeof(uint32_t));
+  buf->add_val(b_str);
+  return buf;
+}

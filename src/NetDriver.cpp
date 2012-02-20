@@ -69,10 +69,8 @@ void NetDriver::receive_info(const boost::system::error_code& ec, size_t byte_tr
 void NetDriver::receive_data(const boost::system::error_code& ec, size_t byte_transferred)
 {
   if (!ec && byte_transferred > 0) {
-	  //发送data_receive信号以便业务模块可以处理具体数据
 	  handle_receive(cb_data_, dbuf_.data(), byte_transferred);
 
-	  //继续监听
 	  this->sdata_.async_receive(buffer(dbuf_), 
 								 queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
 

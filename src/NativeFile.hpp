@@ -4,13 +4,15 @@
 #include <list>
 #include <string>
 #include "FInfo.hpp"
+#include <boost/asio.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
 typedef std::string Hash;
 
 class NativeFileManager {
 public:
-	NativeFileManager(int n): current_(nullptr), max_num_(n) {}
+	NativeFileManager(int n);
+	void run();
 	void new_file(const FInfo&);
 	void write(const Hash& h, long begin, const char* data, size_t s);
 	void read(const Hash& h, long begin, char* data, size_t s);
@@ -21,6 +23,8 @@ private:
 	std::map<Hash, FInfo> files_;
 	char* current_;
 	int max_num_;
+	boost::asio::io_service io_;
+	boost::asio::io_service::work io_work_;
 };
 #endif
 

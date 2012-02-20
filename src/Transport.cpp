@@ -60,6 +60,11 @@ void Transport::run()
 {
   ndriver_.run(); 
 }
+void Transport::native_run() 
+{
+  native_.run();
+}
+
 
 void Transport::handle_info(const FInfo& info)
 {
@@ -110,7 +115,6 @@ void Transport::handle_chunk(const Chunk& c)
 
   //如果是下载队列中的文件
   if (incomplete_.count(c.file_hash)) {
-	  cout << "进入incomplete" << endl;
 
 	  //并且是此文件所缺少的文件块
 	  auto it = local_bill_.find(c.file_hash);

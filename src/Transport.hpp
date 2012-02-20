@@ -27,6 +27,7 @@ public:
 
 
 	void run();
+	void native_run();
 	Payload payload();
 
 

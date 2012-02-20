@@ -39,6 +39,7 @@ public:
 
   //开启网络传输模块
   void network_start();
+  void native_start();
 
 private:
   void cb_new_file(const FInfo&);

@@ -12,6 +12,7 @@ int main()
 {
   FileManager filemanager;
   boost::thread t1(bind(&FileManager::network_start, &filemanager));
+  boost::thread t2(bind(&FileManager::native_start, &filemanager));
 
   JRPC::Server rpc;
   rpc.install_service(rpc_filemanager(filemanager));
@@ -22,6 +23,7 @@ int main()
   s.run();
 
   t1.join();
+  t2.join();
   return 0;
 }
 

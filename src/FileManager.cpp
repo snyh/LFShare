@@ -67,3 +67,7 @@ void FileManager::network_start()
 {
   transport_.run();
 }
+void FileManager::native_start()
+{
+  transport_.native_run();
+}

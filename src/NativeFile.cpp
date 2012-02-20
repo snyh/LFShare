@@ -1,5 +1,13 @@
 #include "NativeFile.hpp"
+using namespace std;
 
+NativeFileManager::NativeFileManager(int n): 
+	current_(nullptr), 
+	max_num_(n),
+	io_(),
+	io_work_(io_) 
+{
+}
 void NativeFileManager::new_file(const FInfo& info)
 {
   files_.insert(make_pair(info.hash, info));
@@ -62,10 +70,17 @@ void NativeFileManager::set_current_file(const Hash& h)
   }
 }
 
+void NativeFileManager::run()
+{
+  io_.run();
+}
+
 void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t s)
 {
-  set_current_file(h);
-  memcpy(current_+begin, src, s);
+  io_.post([=](){
+		   set_current_file(h);
+		   memcpy(current_+begin, src, s);
+		   });
 }
 
 void NativeFileManager::read(const Hash& h, long begin, char* dest, size_t s)

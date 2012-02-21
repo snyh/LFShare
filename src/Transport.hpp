@@ -1,10 +1,7 @@
 #ifndef _TRANSPOR_HPP__
 #define _TRANSPOR_HPP__
-#include <string>
-#include <map>
-#include <set>
+#include "pre.hpp"
 #include <boost/dynamic_bitset.hpp>
-#include <boost/signals2/signal.hpp>
 #include "NetDriver.hpp"
 #include "FInfo.hpp"
 #include "NativeFile.hpp"
@@ -41,7 +38,7 @@ private:
 	void send_chunks();
 	void send_bill();
 
-	void handle_chunk(const Chunk& c);
+	void handle_chunk(RecvBufPtr buf, size_t b, size_t s);
 	void handle_bill(const Bill& b);
 	void handle_info(const FInfo& info);
 	void record_speed();

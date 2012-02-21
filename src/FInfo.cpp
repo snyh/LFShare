@@ -2,7 +2,6 @@
 #include <ios>
 #include <openssl/md4.h>
 //#include <cryptopp/md4.h>
-#include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
 using namespace std;

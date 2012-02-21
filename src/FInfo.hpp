@@ -1,10 +1,6 @@
 #ifndef __FINFO_HPP__
 #define __FINFO_HPP__
-
-#include <string>
-#include <map>
-#include <vector>
-#include <boost/signals2/signal.hpp>
+#include "pre.hpp"
 
 class InfoNotFound : public std::exception {
 };

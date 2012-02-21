@@ -75,7 +75,7 @@ void NativeFileManager::run()
   io_.run();
 }
 
-void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t s)
+void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t s, RecvBufPtr _ignore)
 {
   io_.post([=](){
 		   set_current_file(h);

@@ -1,11 +1,10 @@
 #include "NetDriver.hpp"
-#include <functional>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 using namespace boost::asio;
 using namespace std;
 namespace pl = std::placeholders;
-const int PINFO = 18068;
+const int PCMD = 18068;
 const int PDATA = 18069;
 
 void NetDriver::run()
@@ -18,70 +17,76 @@ void NetDriver::run()
 }
 
 NetDriver::NetDriver()
-	:sinfo_(io_service_, ip::udp::endpoint(ip::udp::v4(), PINFO)),
+	:scmd_(io_service_, ip::udp::endpoint(ip::udp::v4(), PCMD)),
 	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), PDATA)),
 	ssend_(io_service_, ip::udp::v4())
 { 
-  this->sinfo_.async_receive(buffer(ibuf_), queue_.wrap(100, bind(&NetDriver::receive_info, this, pl::_1, pl::_2)));
-  this->sdata_.async_receive(buffer(dbuf_), queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
+  this->scmd_.async_receive(buffer(ibuf_), queue_.wrap(100, bind(&NetDriver::receive_cmd, this, pl::_1, pl::_2)));
+
+  dbuf_ = RecvBufPtr(new RecvBuf);
+  this->sdata_.async_receive(buffer(*dbuf_), queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
 
   ssend_.set_option(socket_base::broadcast(true));
 }
 
-void NetDriver::register_plugin(const PluginType type, const std::string& key, ReceiveFunction cb)
-{
-  if (key.size() > 16) {
-	  cerr << "Warning: KeySize must smaller than 16\n";
-  }
-  if (type == INFO)
-	this->cb_info_.insert(make_pair(key, cb));
-  else if (type == DATA)
-	this->cb_data_.insert(make_pair(key, cb));
-}
 
-void NetDriver::info_send(NetBufPtr buffer)
+void NetDriver::cmd_send(SendBufPtr buffer)
 {
-  static ip::udp::endpoint imulticast(ip::address::from_string("255.255.255.255"), PINFO);
+  static ip::udp::endpoint imulticast(ip::address::from_string("255.255.255.255"), PCMD);
   io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), imulticast);}));
 }
 
-void NetDriver::data_send(NetBufPtr buffer) 
+void NetDriver::data_send(SendBufPtr buffer) 
 {
   static boost::asio::ip::udp::endpoint dmulticast(ip::address::from_string("255.255.255.255"), PDATA);
   io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), dmulticast);}));
 }
 
-void NetDriver::receive_info(const boost::system::error_code& ec, size_t byte_transferred)
+void NetDriver::receive_cmd(const boost::system::error_code& ec, size_t byte_transferred)
 {
   if (!ec && byte_transferred > 0) {
-	  //发送info_receive信号以便业务模块可以处理具体数据
-	  handle_receive(cb_info_, ibuf_.data(), byte_transferred);
+	  //发送cmd_receive信号以便业务模块可以处理具体数据
+	  handle_receive_cmd(byte_transferred);
 
 	  //继续监听
-	  this->sinfo_.async_receive(buffer(ibuf_),
-								 queue_.wrap(100, bind(&NetDriver::receive_info, this, pl::_1, pl::_2)));
+	  this->scmd_.async_receive(buffer(ibuf_),
+								 queue_.wrap(100, bind(&NetDriver::receive_cmd, this, pl::_1, pl::_2)));
 
   } else {
 	  cerr << "Error:" << boost::system::system_error(ec).what();
   }
+}
+void NetDriver::handle_receive_cmd(size_t s)
+{
+  static const size_t KeyMaxSize = 16;
+
+  int pos = -1;
+  char* data = ibuf_.data();
+  pos = find(data, data+KeyMaxSize, '\n') - data;
+  if (pos <= 0) 
+	return;
+  string key(data, pos);
+
+  auto it = cb_cmd_.find(key);
+  if (it != cb_cmd_.end())
+	it->second(data+pos+1, s-pos-1);
 }
 
 void NetDriver::receive_data(const boost::system::error_code& ec, size_t byte_transferred)
 {
   if (!ec && byte_transferred > 0) {
-	  handle_receive(cb_data_, dbuf_.data(), byte_transferred);
-
-	  this->sdata_.async_receive(buffer(dbuf_), 
-								 queue_.wrap(100, bind(&NetDriver::receive_data, this, pl::_1, pl::_2)));
-
+	  handle_receive_data(byte_transferred);
+	  dbuf_ = RecvBufPtr(new RecvBuf);
+	  this->sdata_.async_receive(buffer(*dbuf_),
+		queue_.wrap(100, bind(&NetDriver::receive_data,this, pl::_1, pl::_2)));
   } else {
 	  cerr << "Error:" << boost::system::system_error(ec).what();
   }
 }
-
-void NetDriver::handle_receive(CBS& cbs, const char* data, size_t s)
+void NetDriver::handle_receive_data(size_t s)
 {
   static const size_t KeyMaxSize = 16;
+  char* data = dbuf_->data();
 
   int pos = -1;
   pos = find(data, data+KeyMaxSize, '\n') - data;
@@ -89,10 +94,11 @@ void NetDriver::handle_receive(CBS& cbs, const char* data, size_t s)
 	return;
   string key(data, pos);
 
-  auto it = cbs.find(key);
-  if (it != cbs.end())
-	it->second(data+pos+1, s-pos-1);
+  auto it = cb_data_.find(key);
+  if (it != cb_data_.end())
+	it->second(dbuf_, pos+1, s-pos-1);
 }
+
 
 void NetDriver::timer_helper(TimerPtr timer, int s, std::function<void()> cb)
 {
@@ -101,7 +107,7 @@ void NetDriver::timer_helper(TimerPtr timer, int s, std::function<void()> cb)
 								cb();
 								timer_helper(timer, s, cb);
 								})
-					);
+				   );
 }
 void NetDriver::start_timer(int s, std::function<void()> cb)
 {

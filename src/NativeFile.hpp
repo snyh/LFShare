@@ -1,11 +1,9 @@
 #ifndef _NATIVEFILE_HPP_
 #define _NATIVEFILE_HPP_
-#include <map>
-#include <list>
-#include <string>
-#include "FInfo.hpp"
-#include <boost/asio.hpp>
+#include "pre.hpp"
 #include <boost/iostreams/device/mapped_file.hpp>
+#include "BufType.hpp"
+#include "FInfo.hpp"
 
 typedef std::string Hash;
 
@@ -14,7 +12,8 @@ public:
 	NativeFileManager(int n);
 	void run();
 	void new_file(const FInfo&);
-	void write(const Hash& h, long begin, const char* data, size_t s);
+	void write(const Hash& h, long begin, const char* data, size_t s,
+			   RecvBufPtr keep_resource_alive);
 	void read(const Hash& h, long begin, char* data, size_t s);
 private:
 	void set_current_file(const Hash& h);

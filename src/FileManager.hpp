@@ -1,11 +1,8 @@
 #ifndef __FILEMANAGER_HPP__
 #define __FILEMANAGER_HPP__
-
+#include "pre.hpp"
 #include "FInfo.hpp"
 #include "Transport.hpp"
-#include <vector>
-#include <map>
-#include <string>
 
 class Transport;
 

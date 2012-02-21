@@ -1,8 +1,6 @@
 #include <sstream>
 #include "FInfo.hpp"
 #include "Transport.hpp"
-#include <boost/filesystem.hpp>
-#include <functional>
 
 using namespace std;
 namespace pl = std::placeholders;
@@ -18,18 +16,20 @@ Transport::Transport(FInfoManager& info_manager)
 	ndriver_()
 {
   //注册相关消息
-  ndriver_.register_plugin(NetDriver::INFO, "FILEINFO", [&](const char*data, size_t s){
-						   try { handle_info(info_from_net(data, s)); }
-						   catch (IllegalData&) {assert(!"IllegalData");}
-						   });
-  ndriver_.register_plugin(NetDriver::DATA, "CHUNK", [&](const char*data, size_t s){
-						   try {handle_chunk(chunk_from_net(data, s)); }
-						   catch(IllegalData&) {assert(!"IllegalData");}
-						   });
-  ndriver_.register_plugin(NetDriver::INFO, "BILL", [&](const char*data, size_t s){
-						   try {handle_bill(bill_from_net(data, s));}
-						   catch(IllegalData&) {assert(!"IllegalData");}
-						   });
+  ndriver_.register_cmd_plugin("FILEINFO", 
+								[&](const char*data, size_t s){
+								try { handle_info(info_from_net(data, s)); }
+								catch (IllegalData&) {assert(!"IllegalData");}
+								});
+  ndriver_.register_cmd_plugin("BILL",
+								[&](const char*data, size_t s){
+								try {handle_bill(bill_from_net(data, s));}
+								catch(IllegalData&) {assert(!"IllegalData");}
+								});
+  ndriver_.register_data_plugin("CHUNK", 
+								[&](RecvBufPtr buf, size_t b, size_t s) {
+								handle_chunk(buf, b, s);
+								});
   //注册定时器以便统计速度
   ndriver_.start_timer(1, bind(&Transport::record_speed, this));
   //每5秒发送一次本机所需要的文件块
@@ -42,11 +42,11 @@ Transport::Transport(FInfoManager& info_manager)
 void Transport::cb_new_info(const FInfo& f)
 {
   if (f.type == FInfo::Local) {
-	complete_.insert(f.hash);
-	native_.new_file(f);
+	  complete_.insert(f.hash);
+	  native_.new_file(f);
 
-	//向网络发送此文件信息
-	ndriver_.info_send(info_to_net(f));
+	  //向网络发送此文件信息
+	  ndriver_.cmd_send(info_to_net(f));
   }
 }
 
@@ -81,7 +81,7 @@ void Transport::send_bill()
   //TODO:一次是否发送太多文件块请求？
   for (auto& t: local_bill_) {
 	  Bill bill{t.first, t.second};
-	  ndriver_.info_send(bill_to_net(bill));
+	  ndriver_.cmd_send(bill_to_net(bill));
   }
 }
 void Transport::handle_bill(const Bill& b)
@@ -107,40 +107,49 @@ void Transport::handle_bill(const Bill& b)
   }
 }
 
-
-string hash2str(const Hash&);
-void Transport::handle_chunk(const Chunk& c)
+void Transport::handle_chunk(RecvBufPtr buf, size_t b, size_t s)
 {
-  payload_.global++;
+  try {
+	  char* data = buf->data()+b;
+	  Chunk c = chunk_from_net(data, s);
+	  payload_.global++;
 
-  //如果是下载队列中的文件
-  if (incomplete_.count(c.file_hash)) {
+	  //如果是下载队列中的文件
+	  if (incomplete_.count(c.file_hash)) {
 
-	  //并且是此文件所缺少的文件块
-	  auto it = local_bill_.find(c.file_hash);
-	  if (it != local_bill_.end() && it->second[c.index]) {
-		  //就取消文件块缺失标记
+		  //并且是此文件所缺少的文件块
+		  auto it = local_bill_.find(c.file_hash);
+		  if (it != local_bill_.end() && it->second[c.index]) {
+			  //就取消文件块缺失标记
+			  it->second[c.index] = false;
+			  //并写入文件
+			  native_.write(c.file_hash, 
+							c.index*FInfo::chunksize, 
+							c.data, 
+							c.size,
+							buf);
+
+			  //检查是否已经完成
+			  check_complete(c.file_hash);
+
+			  //同时记录此文件有效获得一次文件块以便统计下载速度
+			  payload_.files[c.file_hash]++;
+
+			  //继续发送Bill以便其他节点可以马上继续发送文件块
+			  ndriver_.add_task(100, bind(&Transport::send_bill, this));
+		  } 
+	  }
+
+	  //如果是全局缺少的文件块则取消文件块缺失标记
+	  auto it = global_bill_.find(c.file_hash);
+	  if (it != global_bill_.end() && it->second[c.index]){
 		  it->second[c.index] = false;
-		  //并写入文件
-		  native_.write(c.file_hash, c.index*FInfo::chunksize, c.data, c.size);
-
-		  //检查是否已经完成
-		  check_complete(c.file_hash);
-
-		  //同时记录此文件有效获得一次文件块以便统计下载速度
-		  payload_.files[c.file_hash]++;
-
-		  //继续发送Bill以便其他节点可以马上继续发送文件块
-		  ndriver_.add_task(100, bind(&Transport::send_bill, this));
-	  } 
-  }
-
-  //如果是全局缺少的文件块则取消文件块缺失标记
-  auto it = global_bill_.find(c.file_hash);
-  if (it != global_bill_.end() && it->second[c.index]){
-	  it->second[c.index] = false;
+	  }
+  } catch(IllegalData&) {
+	  assert(!"IllegalData");
   }
 }
+
 void send_chunk_helper(vector<Chunk>& chunks,
 					   const Hash& h,
 					   boost::dynamic_bitset<>& bits,

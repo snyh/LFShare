@@ -1,32 +1,7 @@
 #ifndef __NetDriver_HPP__
 #define __NetDriver_HPP__
-#include <boost/asio.hpp>
-#include <memory>
-#include <functional>
-#include <string>
-#include <array>
-#include <map>
-#include <queue>
-
-class NetBuf {
-public:
-	void add_val(const std::string& s) {
-		tmp_.push_back(s);
-		asio_.push_back(boost::asio::buffer(tmp_[tmp_.size()-1]));
-	}
-	void add_val(void* t, size_t s) {
-		  tmp_.push_back(std::string((char*)t, s));
-		  asio_.push_back(boost::asio::buffer(tmp_[tmp_.size()-1]));
-	}
-	void add_ref(const char*data, size_t s) {
-		asio_.push_back(boost::asio::buffer(data, s));
-	}
-	std::vector<boost::asio::const_buffer>& to_asio_buf() { return asio_; }
-private:
-	std::vector<boost::asio::const_buffer> asio_;
-	std::vector<std::string> tmp_;
-};
-typedef std::shared_ptr<NetBuf> NetBufPtr;
+#include "pre.hpp"
+#include "BufType.hpp"
 
 class HandlerPriorityQueue {
 public:
@@ -87,27 +62,36 @@ void asio_handler_invoke(Function f, HandlerPriorityQueue::WrappedHandler<Handle
 
 class NetDriver {
 public:
-  enum PluginType {INFO, DATA};
-  typedef std::function<void(const char*, size_t)> ReceiveFunction;
+  typedef std::function<void(const char*, size_t)> RecvCmdFun;
+  typedef std::function<void(RecvBufPtr, size_t, size_t)> RecvDataFun;
   typedef std::shared_ptr<boost::asio::deadline_timer> TimerPtr;
 
   NetDriver();
   void run();
   void stop();
 
-  void register_plugin(const PluginType, const std::string& key, ReceiveFunction cb);
+  void register_cmd_plugin(const std::string& key, RecvCmdFun cb) {
+	  assert(key.size() < 16);
+	  this->cb_cmd_.insert(make_pair(key, cb));
+  }
+  void register_data_plugin(const std::string& key, RecvDataFun cb) {
+	  assert(key.size() < 16);
+	  this->cb_data_.insert(make_pair(key, cb));
+  }
 
-  void info_send(NetBufPtr buffer);
-  void data_send(NetBufPtr buffer);
+  void cmd_send(SendBufPtr buffer);
+  void data_send(SendBufPtr buffer);
 
   void start_timer(int s, std::function<void()> cb);
   void add_task(int priority, std::function<void()> cb);
 
 private:
-  typedef std::map<std::string, ReceiveFunction> CBS;
-  void handle_receive(CBS& cbs, const char* data, size_t s);
+  typedef std::map<std::string, RecvCmdFun> CCB;
+  typedef std::map<std::string, RecvDataFun> DCB;
+  void handle_receive_cmd(size_t s);
+  void handle_receive_data(size_t s);
 
-  void receive_info(const boost::system::error_code& ec, size_t byte_transferred);
+  void receive_cmd(const boost::system::error_code& ec, size_t byte_transferred);
   void receive_data(const boost::system::error_code& ec, size_t byte_transferred);
 
   void timer_helper(TimerPtr timer, int s, std::function<void()> cb);
@@ -115,16 +99,17 @@ private:
 private:
   boost::asio::io_service io_service_;
 
-  boost::asio::ip::udp::socket sinfo_;
+  boost::asio::ip::udp::socket scmd_;
   boost::asio::ip::udp::socket sdata_;
 
   boost::asio::ip::udp::socket ssend_;
 
   std::array<char, 10240> ibuf_;
-  std::array<char, 4+16+65536> dbuf_;
+  RecvBufPtr dbuf_;
 
-  CBS cb_info_;
-  CBS cb_data_;
+
+  CCB cb_cmd_;
+  DCB cb_data_;
 
   HandlerPriorityQueue queue_;
 };

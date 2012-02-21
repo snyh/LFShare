@@ -12,6 +12,7 @@ endif(WIN32)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
 add_executable(server
+	src/pre.hpp.gch
 	src/FInfo.cpp
 	src/NetDriver.cpp
 	src/Transport.cpp

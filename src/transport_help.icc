@@ -50,9 +50,9 @@ FInfo info_from_net(const char* data, size_t s)
   return info;
 }
 
-NetBufPtr info_to_net(const FInfo& info)
+SendBufPtr info_to_net(const FInfo& info)
 {
-  NetBufPtr buf(new NetBuf);
+  SendBufPtr buf(new SendBuf);
   buf->add_val("FILEINFO\n");
   buf->add_val(info.hash);
 
@@ -108,10 +108,10 @@ Chunk chunk_from_net(const char* data, size_t size)
   Chunk c(f_h, c_h, i, s, d);
   return c;
 }
-NetBufPtr chunk_to_net(const Chunk& c)
+SendBufPtr chunk_to_net(const Chunk& c)
 {
   uint32_t s;
-  NetBufPtr buf(new NetBuf);
+  SendBufPtr buf(new SendBuf);
   buf->add_val("CHUNK\n");
   buf->add_val(c.file_hash);
   buf->add_val(c.chunk_hash);
@@ -140,10 +140,10 @@ Bill bill_from_net(const char* data, size_t s)
   return bill;
 }
 
-NetBufPtr bill_to_net(Bill& b)
+SendBufPtr bill_to_net(Bill& b)
 {
   assert(b.hash.size() == 16);
-  NetBufPtr buf(new NetBuf);
+  SendBufPtr buf(new SendBuf);
   buf->add_val("BILL\n");
   buf->add_val(b.hash);
 

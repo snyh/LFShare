@@ -3,6 +3,7 @@
 #include "pre.hpp"
 #include "config.hpp"
 
+
 class InfoNotFound : public std::exception {
 };
 class InfoExists: public std::exception {
@@ -10,7 +11,6 @@ class InfoExists: public std::exception {
 class InfoTypeError: public std::exception {
 };
 
-typedef std::string Hash;
 Hash hash_data(const char* data, size_t size);
 class HashInvalid: public std::exception {
 public:

@@ -2,44 +2,12 @@
 #define __FINFO_HPP__
 #include "pre.hpp"
 #include "config.hpp"
-
-
-class InfoNotFound : public std::exception {
-};
-class InfoExists: public std::exception {
-};
-class InfoTypeError: public std::exception {
-};
-
-Hash hash_data(const char* data, size_t size);
-class HashInvalid: public std::exception {
-public:
-  	HashInvalid() = default;
-	HashInvalid(const std::string& msg): m_(msg) {}
-	const char* what() const noexcept { return m_.c_str(); }
-	~HashInvalid() noexcept {}
-private:
-	std::string m_;
-};
-
-//FInfo用来描述一个File的信息，以便可以在网络上进行传输.
-struct FInfo {
-	std::string path;
-	Hash hash;
-	uint32_t chunknum;
-	static const uint32_t chunksize = CHUNK_SIZE;
-	uint32_t lastchunksize;
-	enum Type { Local, Downloading, Remote} type;
-
-	FInfo()=default;
-	FInfo(const std::string& p, Hash h, int cn, uint32_t ls)
-	  : path(p), hash(h), chunknum(cn), lastchunksize(ls){}
-};
+#include "CoreStruct.hpp"
 
 class FInfoManager {
 public:
 	/**
-	 * @brief add_info 向local_插入一条数据
+	 * @brief  add_info 向local_插入一条数据
 	 *
 	 * @param path
 	 * @exception 如果path所指向的文件件存在则抛出InfoExists异常

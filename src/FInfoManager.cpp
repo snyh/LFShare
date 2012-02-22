@@ -1,29 +1,20 @@
-#include "FInfo.hpp"
-#include <ios>
-#include <openssl/md4.h>
-//#include <cryptopp/md4.h>
+#include "FInfoManager.hpp"
 #include <boost/iostreams/device/mapped_file.hpp>
 
 using namespace std;
 using namespace boost;
 
-Hash hash_data(const char* data, size_t size)
-{
-  char md4[16];
-  MD4((const unsigned char*)data, size, (unsigned char*)md4);
-  Hash hash(md4, 16);
-  return hash;
-}
 
 FInfo FInfoManager::add_info(const std::string& path)
 {
+  //TODO: 增加目录支持
 	Hash hash;
 	int32_t chunknum;
 	int32_t lastchunksize;
 	uintmax_t filesize;
 
 	filesize = filesystem::file_size(path);
-	iostreams::mapped_file file(path, ios_base::out);
+	iostreams::mapped_file file(path);
 
 	hash = hash_data(file.data(), filesize);
 
@@ -36,8 +27,14 @@ FInfo FInfoManager::add_info(const std::string& path)
 		lastchunksize = filesize % FInfo::chunksize;
 		chunknum += lastchunksize > 0 ? 1: 0;
 
-		FInfo info(path, hash, chunknum, lastchunksize);
-		info.type = FInfo::Local;
+		FInfo info;
+		info.file_type = FInfo::NormalFile;
+		info.hash = hash;
+		info.chunknum = chunknum;
+		info.path = path;
+		info.lastchunksize = lastchunksize;
+		info.status = FInfo::Local;
+
 		this->add_info(info);
 		return info;
 	}

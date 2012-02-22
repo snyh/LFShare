@@ -78,10 +78,14 @@ void Transport::handle_info(const FInfo& info)
 
 void Transport::send_bill()
 {
+  if (incomplete_.empty())
+	return;
   //TODO:一次是否发送太多文件块请求？
   for (auto& t: local_bill_) {
-	  Bill bill{t.first, t.second};
-	  ndriver_.cmd_send(bill_to_net(bill));
+	  if (incomplete_.count(t.first) != 0) {
+		  Bill bill{t.first, t.second};
+		  ndriver_.cmd_send(bill_to_net(bill));
+	  }
   }
 }
 void Transport::handle_bill(const Bill& b)

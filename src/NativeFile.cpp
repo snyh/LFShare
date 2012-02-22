@@ -80,6 +80,7 @@ void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t
   io_.post([=](){
 		   set_current_file(h);
 		   memcpy(current_+begin, src, s);
+		   _ignore;
 		   });
 }
 

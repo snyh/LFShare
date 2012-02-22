@@ -21,16 +21,16 @@ void NativeFileManager::push_hot(const Hash& h)
   using namespace boost::iostreams;
   FInfo& info = files_.find(h)->second;
 
-  if (info.type == FInfo::Local) {
+  if (info.status == FInfo::Local) {
 	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
-  } else if (info.type == FInfo::Remote) {
+  } else if (info.status == FInfo::Remote) {
 	  mapped_file_params param;
 	  param.path = info.path;
 	  param.flags = mapped_file::readwrite;
 	  param.new_file_size = (info.chunknum-1) * FInfo::chunksize + info.lastchunksize;
 
 	  hot_.push_front(make_pair(info.hash, mapped_file(param)));
-  } else if (info.type == FInfo::Downloading) {
+  } else if (info.status == FInfo::Downloading) {
 	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
   }
 
@@ -75,18 +75,23 @@ void NativeFileManager::run()
   io_.run();
 }
 
-void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t s, RecvBufPtr _ignore)
+void NativeFileManager::async_write(const Hash& h, long begin, const char* src, size_t s, 
+									function<void()> cb)
 {
   io_.post([=](){
 		   set_current_file(h);
 		   memcpy(current_+begin, src, s);
-		   _ignore;
+		   cb();
 		   });
 }
 
-void NativeFileManager::read(const Hash& h, long begin, char* dest, size_t s)
+void NativeFileManager::async_read(const Hash& h, long begin, char* dest, size_t s,
+								   function<void()> cb)
 {
-  assert(current_ != nullptr);
-  set_current_file(h);
-  memcpy(dest, current_+begin, s);
+  io_.post([=](){
+		   assert(current_ != nullptr);
+		   set_current_file(h);
+		   memcpy(dest, current_+begin, s);
+		   cb();
+		   });
 }

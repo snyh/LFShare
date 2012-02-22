@@ -71,3 +71,8 @@ void FileManager::native_start()
 {
   transport_.native_run();
 }
+
+boost::dynamic_bitset<> FileManager::chunk_info(const Hash& h)
+{
+  return transport_.get_bill(h);
+}

@@ -3,6 +3,7 @@
 #include "pre.hpp"
 #include "FInfo.hpp"
 #include "Transport.hpp"
+#include <boost/dynamic_bitset.hpp>
 
 class Transport;
 
@@ -33,6 +34,8 @@ public:
 
   //从当前以及文件信息中删除此某一文件信息
   void remove(const Hash& h);
+
+  boost::dynamic_bitset<> chunk_info(const Hash& h);
 
   //开启网络传输模块
   void network_start();

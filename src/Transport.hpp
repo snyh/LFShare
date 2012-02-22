@@ -22,6 +22,7 @@ public:
 	void start_receive(const Hash& file_hash);
 	void stop_receive(const Hash& file_hash);
 
+	boost::dynamic_bitset<> get_bill(const Hash&);
 
 	void run();
 	void native_run();

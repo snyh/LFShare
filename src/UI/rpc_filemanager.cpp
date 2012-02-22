@@ -43,6 +43,14 @@ MP info2json(const FInfo& info)
   return node;
 }
 
+MP bits2json(const boost::dynamic_bitset<>& b)
+{
+  JRPC::JSON result;
+  for (int i=0; i<b.size(); i++) 
+	result[i] = b[i] ? 0: 1;
+  return result;
+}
+
 MP msg2json(const NewMsg& msg)
 {
   JRPC::JSON result; result["newfile"]; result["pfile"]; result["progress"];
@@ -64,6 +72,7 @@ MP msg2json(const NewMsg& msg)
   }
   return result;
 }
+
 
 JRPC::Service& rpc_filemanager(FileManager& theMFM)
 {
@@ -121,7 +130,14 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 			  return msg2json(msg);
 		  }
 		},
+		{
+		  "chunk_info", [&](MP& j){
+			  auto b = theMFM.chunk_info(str2hash(j["hash"].asString()));
+			  return bits2json(b);
+		  }
+		}
   };
   return filemanager;
 }
+
 

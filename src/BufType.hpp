@@ -1,6 +1,7 @@
 #ifndef __BUFTYPE_HPP_
 #define __BUFTYPE_HPP_
 #include "pre.hpp"
+#include "config.hpp"
 
 class SendBuf {
 public:
@@ -22,7 +23,7 @@ private:
 };
 typedef std::shared_ptr<SendBuf> SendBufPtr;
 
-#define RECVBUFLEN (16+16+4+4+6000)  //!!需要和FInfo::chunksize保持同步
+#define RECVBUFLEN (16+16+16+4+4+CHUNK_SIZE)  
 typedef std::array<char, RECVBUFLEN> RecvBuf;
 typedef std::shared_ptr<RecvBuf> RecvBufPtr;
 

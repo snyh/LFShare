@@ -4,8 +4,6 @@
 using namespace boost::asio;
 using namespace std;
 namespace pl = std::placeholders;
-const int PCMD = 18068;
-const int PDATA = 18069;
 
 void NetDriver::run()
 {
@@ -17,8 +15,8 @@ void NetDriver::run()
 }
 
 NetDriver::NetDriver()
-	:scmd_(io_service_, ip::udp::endpoint(ip::udp::v4(), PCMD)),
-	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), PDATA)),
+	:scmd_(io_service_, ip::udp::endpoint(ip::udp::v4(), UDP_CMD_PORT)),
+	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), UDP_DATA_PORT)),
 	ssend_(io_service_, ip::udp::v4())
 { 
   this->scmd_.async_receive(buffer(ibuf_), queue_.wrap(100, bind(&NetDriver::receive_cmd, this, pl::_1, pl::_2)));
@@ -32,13 +30,13 @@ NetDriver::NetDriver()
 
 void NetDriver::cmd_send(SendBufPtr buffer)
 {
-  static ip::udp::endpoint imulticast(ip::address::from_string("255.255.255.255"), PCMD);
+  static ip::udp::endpoint imulticast(ip::address::from_string("255.255.255.255"), UDP_CMD_PORT);
   io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), imulticast);}));
 }
 
 void NetDriver::data_send(SendBufPtr buffer) 
 {
-  static boost::asio::ip::udp::endpoint dmulticast(ip::address::from_string("255.255.255.255"), PDATA);
+  static boost::asio::ip::udp::endpoint dmulticast(ip::address::from_string("255.255.255.255"), UDP_DATA_PORT);
   io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), dmulticast);}));
 }
 
@@ -93,10 +91,11 @@ void NetDriver::handle_receive_data(size_t s)
   if (pos <= 0) 
 	return;
   string key(data, pos);
+  pos += 1;
 
   auto it = cb_data_.find(key);
   if (it != cb_data_.end())
-	it->second(dbuf_, pos+1, s-pos-1);
+	it->second(dbuf_, pos, s-pos);
 }
 
 

@@ -1,6 +1,7 @@
 #ifndef __FINFO_HPP__
 #define __FINFO_HPP__
 #include "pre.hpp"
+#include "config.hpp"
 
 class InfoNotFound : public std::exception {
 };
@@ -26,7 +27,7 @@ struct FInfo {
 	std::string path;
 	Hash hash;
 	uint32_t chunknum;
-	static const uint32_t chunksize = 60000;
+	static const uint32_t chunksize = CHUNK_SIZE;
 	uint32_t lastchunksize;
 	enum Type { Local, Downloading, Remote} type;
 

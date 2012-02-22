@@ -123,11 +123,13 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t b, size_t s)
 			  //就取消文件块缺失标记
 			  it->second[c.index] = false;
 			  //并写入文件
+			  /*
 			  native_.write(c.file_hash, 
 							c.index*FInfo::chunksize, 
 							c.data, 
 							c.size,
 							buf);
+							*/
 
 			  //检查是否已经完成
 			  check_complete(c.file_hash);

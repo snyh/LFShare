@@ -1,9 +1,15 @@
 #ifndef __CORESTRUCT_HPP__
 #define __CORESTRUCT_HPP__
+#include "config.hpp"
 #include <cstdint>
+#include <string>
+#include <array>
 
-//当前使用md4计算hash
-typedef unsigned char[16] Hash;
+/// 当前使用md4计算hash
+typedef std::string  Hash;
+
+/// 计算Hash
+Hash hash_data(const char* data, size_t size);
 
 /**
  * @brief Bill用来告诉网络本机所缺少的文件块
@@ -12,21 +18,18 @@ typedef unsigned char[16] Hash;
  * 此结构体占用大小16+16+8+32+16=72B, 加上BILL\n的5B远小于1480B.
  */
 struct Bill {
-public:
-  Bill();
-private:
   /// 所属文件hash
   Hash hash;
-
-  /// 表示bits中有效数据占多少位+1，值界于0～255
-  uint8_t len;
-
-  /// 按位存储文件块是否缺少
-  uint32_t bits;
 
   /// 此Bill所属区域即bits起始位置, 一个区域拥有256块数据因此一共能表达
   //	256 * 2^16 * 60000 = 937.5GB 大小的文件。
   uint16_t region;
+
+  /// 按位存储文件块是否缺少
+  uint32_t bits;
+
+  /// 表示bits中有效数据占多少位+1，值界于0～255
+  uint8_t len;
 };
 
 
@@ -51,12 +54,12 @@ struct FInfo {
 	/// 对应文件拥有的chunk数量
 	uint32_t chunknum;
 
+	/// 对应文件肯定不能完美被CHUNK_SIZE整除，此值保存最后一块chunk的大小
+	uint16_t lastchunksize;
+
 	/// 在本机时保存对应文件的物理路径，传递到网络时仅传递文件名
 	//	文件名大于256字节时会被自动截断。
 	std::string path;
-
-	/// 对应文件肯定不能完美被CHUNK_SIZE整除，此值保存最后一块chunk的大小
-	uint16_t lastchunksize;
 
 
 	// 以下成员并不再网络中进行传输
@@ -90,6 +93,36 @@ struct Chunk {
 
 	/// 指向数据真实存储地, 网络传输时占用大小1~CHUNKSIZE(60000) 
 	const char* data;
+};
+
+#include "BufType.hpp"
+
+FInfo 		info_from_net(const char* data, size_t s);
+SendBufPtr 	info_to_net(const FInfo& info);
+
+Chunk 		chunk_from_net(const char* data, size_t size);
+SendBufPtr 	chunk_to_net(const Chunk& c);
+
+Bill 		bill_from_net(const char* data, size_t s);
+SendBufPtr 	bill_to_net(const Bill& b);
+
+class IllegalData : public std::exception {
+};
+class InfoNotFound : public std::exception {
+};
+class InfoExists: public std::exception {
+};
+class InfoTypeError: public std::exception {
+};
+
+class HashInvalid: public std::exception {
+public:
+  HashInvalid() = default;
+  HashInvalid(const std::string& msg): m_(msg) {}
+  const char* what() const noexcept { return m_.c_str(); }
+  ~HashInvalid() noexcept {}
+private:
+  std::string m_;
 };
 
 

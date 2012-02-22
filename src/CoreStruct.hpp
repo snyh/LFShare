@@ -93,6 +93,25 @@ struct Chunk {
 
 	/// 指向数据真实存储地, 网络传输时占用大小1~CHUNKSIZE(60000) 
 	const char* data;
+
+
+	Chunk(const Hash& fh, const Hash& ch, uint32_t i, uint16_t s, const char* d):
+		file_hash(fh),
+		chunk_hash(ch),
+		index(i),
+		size(s),
+		data(d)
+	{
+	}
+
+	Chunk(const Hash& fh, uint32_t i, uint16_t s, const char* d):
+		file_hash(fh), 
+		chunk_hash(hash_data(d, s)),
+		index(i),
+		size(s),
+		data(d)
+	{
+	}
 };
 
 #include "BufType.hpp"

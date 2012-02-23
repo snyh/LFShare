@@ -67,15 +67,15 @@ MP msg2json(const NewMsg& msg)
 }
 
 
-JRPC::Service& rpc_filemanager(FileManager& theMFM)
+JRPC::Service& rpc_dispatcher(Dispatcher& dispatcher)
 {
-  static JRPC::Service filemanager;
-  filemanager.name = "filemanager";
-  filemanager.methods = {
+  static JRPC::Service the_dispatcher;
+  the_dispatcher.name = "filemanager";
+  the_dispatcher.methods = {
 		{
 		  "file_list", [&](MP& j){
 			  JRPC::JSON result;
-			  for (auto i : theMFM.current_list()) {
+			  for (auto i : dispatcher.current_list()) {
 				  result.append(info2json(i));
 			  }
 			  return result;
@@ -84,7 +84,7 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "add_file", [&](MP& j){
 			  try {
-				  theMFM.add_local_file(j["path"].asString());
+				  dispatcher.add_local_file(j["path"].asString());
 				  return JRPC::JSON("添加文件成功");
 			  } catch (InfoExists&) {
 				  return JRPC::JSON("已经存在此文件"); 
@@ -96,7 +96,7 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "del_file", [&](MP& j){
 			  try {
-				  theMFM.remove(str2hash(j["hash"].asString()));
+				  dispatcher.remove(str2hash(j["hash"].asString()));
 				  return JRPC::JSON("成功删除");
 			  } catch (InfoNotFound&) {
 				  return JRPC::JSON("所删除文件不存在");
@@ -108,7 +108,7 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "download", [&](MP& j){
 			  try {
-				  theMFM.start_download(str2hash(j["hash"].asString()));
+				  dispatcher.start_download(str2hash(j["hash"].asString()));
 				  return JRPC::JSON("下载请求提交成功");
 			  } catch (InfoNotFound&) {
 				  return JRPC::JSON("文件不存在");
@@ -119,18 +119,18 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		},
 		{
 		  "refresh", [&](MP& j){
-			  NewMsg msg = theMFM.refresh();
+			  NewMsg msg = dispatcher.refresh();
 			  return msg2json(msg);
 		  }
 		},
 		{
 		  "chunk_info", [&](MP& j){
-			  auto b = theMFM.chunk_info(str2hash(j["hash"].asString()));
+			  auto b = dispatcher.chunk_info(str2hash(j["hash"].asString()));
 			  return b;
 		  }
 		}
   };
-  return filemanager;
+  return the_dispatcher;
 }
 
 

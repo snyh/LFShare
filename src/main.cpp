@@ -4,18 +4,18 @@
 
 using namespace std;
 
-JRPC::Service& rpc_filemanager(FileManager&);
+JRPC::Service& rpc_dispatcher(Dispatcher&);
 JRPC::Service& rpc_systeminfo();
 
 
 int main()
 {
-  FileManager filemanager;
-  boost::thread t1(bind(&FileManager::network_start, &filemanager));
-  boost::thread t2(bind(&FileManager::native_start, &filemanager));
+  Dispatcher dispatcher;
+  boost::thread t1(bind(&Dispatcher::network_start, &dispatcher));
+  boost::thread t2(bind(&Dispatcher::native_start, &dispatcher));
 
   JRPC::Server rpc;
-  rpc.install_service(rpc_filemanager(filemanager));
+  rpc.install_service(rpc_dispatcher(dispatcher));
   rpc.install_service(rpc_systeminfo());
 
   Server s;

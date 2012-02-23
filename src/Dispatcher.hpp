@@ -1,11 +1,8 @@
 #ifndef __FILEMANAGER_HPP__
 #define __FILEMANAGER_HPP__
 #include "pre.hpp"
-#include "FInfo.hpp"
+#include "FInfoManager.hpp"
 #include "Transport.hpp"
-#include <boost/dynamic_bitset.hpp>
-
-class Transport;
 
 struct NewMsg {
 	Payload payload;
@@ -13,9 +10,9 @@ struct NewMsg {
 	std::vector<FInfo> new_files;
 };
 
-class FileManager {
+class Dispatcher {
 public:
-  FileManager();
+  Dispatcher();
 
   //更新数据
   NewMsg refresh();
@@ -35,7 +32,7 @@ public:
   //从当前以及文件信息中删除此某一文件信息
   void remove(const Hash& h);
 
-  boost::dynamic_bitset<> chunk_info(const Hash& h);
+  std::string chunk_info(const Hash& h);
 
   //开启网络传输模块
   void network_start();

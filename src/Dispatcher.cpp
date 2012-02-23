@@ -1,23 +1,23 @@
-#include "FileManager.hpp"
+#include "Dispatcher.hpp"
 using namespace std;
 namespace pl = std::placeholders;
 
-FileManager::FileManager() 
+Dispatcher::Dispatcher() 
 	 :info_manager_(),
 	 transport_(info_manager_)
 {
-  transport_.on_new_chunk.connect(bind(&FileManager::cb_new_chunk, this, pl::_1, pl::_2));
-  transport_.on_new_file.connect(bind(&FileManager::cb_new_file, this, pl::_1));
+  transport_.on_new_chunk.connect(bind(&Dispatcher::cb_new_chunk, this, pl::_1, pl::_2));
+  transport_.on_new_file.connect(bind(&Dispatcher::cb_new_file, this, pl::_1));
 }
 
-void FileManager::add_local_file(const string& path)
+void Dispatcher::add_local_file(const string& path)
 {
   FInfo info = info_manager_.add_info(path);
   cb_new_file(info);
   //transport_.add_completed_file(info.hash);
 }
 
-void FileManager::remove(const Hash& h)
+void Dispatcher::remove(const Hash& h)
 {
   FInfo info = info_manager_.del_info(h);
   /*
@@ -28,34 +28,39 @@ void FileManager::remove(const Hash& h)
 	*/
 }
 
-vector<FInfo> FileManager::current_list()
+vector<FInfo> Dispatcher::current_list()
 {
   return info_manager_.list();
 }
 
-void FileManager::start_download(const Hash& h)
+void Dispatcher::start_download(const Hash& h)
 {
   transport_.start_receive(h);
+
+  // 必须在开始之后再进行改变状态。因为如果h指向的文件是
+  // remote类型则需要用特殊的方式打开文件
+  // 基本意思就是必须开始下载之后才能改变文件的状态
+  info_manager_.modify_status(h, FInfo::Downloading);
 }
 
-void FileManager::stop_download(const Hash& h)
+void Dispatcher::stop_download(const Hash& h)
 {
   transport_.stop_receive(h);
 }
 
 
-void FileManager::cb_new_file(const FInfo& info)
+void Dispatcher::cb_new_file(const FInfo& info)
 {
   assert("newFile");
   msg_.new_files.push_back(info);
 }
 
-void FileManager::cb_new_chunk(const Hash& h, double progress)
+void Dispatcher::cb_new_chunk(const Hash& h, double progress)
 {
   msg_.progress[h] = progress;
 }
 
-NewMsg FileManager::refresh() 
+NewMsg Dispatcher::refresh() 
 { 
   NewMsg old = msg_;
   old.payload = transport_.payload();
@@ -63,16 +68,16 @@ NewMsg FileManager::refresh()
   return old;
 }
 
-void FileManager::network_start()
+void Dispatcher::network_start()
 {
   transport_.run();
 }
-void FileManager::native_start()
+void Dispatcher::native_start()
 {
   transport_.native_run();
 }
 
-boost::dynamic_bitset<> FileManager::chunk_info(const Hash& h)
+string Dispatcher::chunk_info(const Hash& h)
 {
-  return transport_.get_bill(h);
+  return transport_.get_chunk_info(h);
 }

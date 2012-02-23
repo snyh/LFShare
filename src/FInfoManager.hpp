@@ -41,6 +41,8 @@ public:
 	 *
 	 * @return 
 	 */
+
+	void modify_status(const Hash& h, FInfo::Status s);
 	const FInfo& find(const Hash& h);
 	std::vector<FInfo> list();
 

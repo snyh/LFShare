@@ -55,8 +55,9 @@ void FInfoManager::add_info(const FInfo& f)
 FInfo FInfoManager::del_info(const Hash& h)
 {
   auto it = all_info_.find(h);
-  if (it == all_info_.end())
+  if (it == all_info_.end()) {
 	throw InfoNotFound();
+  }
 
   FInfo tmp = it->second;
   all_info_.erase(it);
@@ -68,8 +69,9 @@ FInfo FInfoManager::del_info(const Hash& h)
 const FInfo& FInfoManager::find(const Hash& h)
 {
   auto it = all_info_.find(h);
-  if (it == all_info_.end())
+  if (it == all_info_.end()) {
 	throw InfoNotFound();
+  }
 
   return it->second;
 }
@@ -81,4 +83,12 @@ std::vector<FInfo> FInfoManager::list()
 	  v.push_back(t.second);
   }
   return v;
+}
+void FInfoManager::modify_status(const Hash& h, FInfo::Status s)
+{
+  auto it = all_info_.find(h);
+  if (it == all_info_.end()) {
+	throw InfoNotFound();
+  }
+  it->second.status = s;
 }

@@ -61,16 +61,17 @@ void NetDriver::data_send(SendBufPtr buffer)
 
 void NetDriver::handle_receive_cmd(const boost::system::error_code& ec, size_t byte_transferred)
 {
-  if (!ec && byte_transferred > 0 && ep_cmd_.address() != local_ip_) {
+  if (!ec && byte_transferred > 0 ) {
 	  //发送cmd_receive信号以便业务模块可以处理具体数据
-	  call_cmd_plugin(byte_transferred);
+	  if (ep_cmd_.address() != local_ip_)
+		call_cmd_plugin(byte_transferred);
 
 	  //继续监听
 	  this->scmd_.async_receive_from(buffer(ibuf_), ep_cmd_,
 								 queue_.wrap(100, bind(&NetDriver::handle_receive_cmd, this, pl::_1, pl::_2)));
 
   } else {
-	  cerr << "Error:" << boost::system::system_error(ec).what();
+	  cerr << "!Error:" << boost::system::system_error(ec).what() << endl;
   }
 }
 void NetDriver::call_cmd_plugin(size_t s)
@@ -91,14 +92,15 @@ void NetDriver::call_cmd_plugin(size_t s)
 
 void NetDriver::handle_receive_data(const boost::system::error_code& ec, size_t byte_transferred)
 {
-  if (!ec && byte_transferred > 0 && ep_data_.address() != local_ip_) {
-	  cb_data_(dbuf_, byte_transferred);
+  if (!ec && byte_transferred > 0) {
+	  if (ep_data_.address() != local_ip_)
+		cb_data_(dbuf_, byte_transferred);
 
 	  dbuf_ = RecvBufPtr(new RecvBuf);
 	  this->sdata_.async_receive_from(buffer(*dbuf_), ep_data_,
 		queue_.wrap(100, bind(&NetDriver::handle_receive_data,this, pl::_1, pl::_2)));
   } else {
-	  cerr << "Error:" << boost::system::system_error(ec).what();
+	  cerr << "!Error:" << boost::system::system_error(ec).what() << endl;
   }
 }
 

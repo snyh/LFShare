@@ -13,10 +13,11 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
 add_executable(server
 	src/pre.hpp.gch
-	src/FInfo.cpp
+	src/FInfoManager.cpp
 	src/NetDriver.cpp
 	src/Transport.cpp
-	src/FileManager.cpp
+	src/Dispatcher.cpp
+	src/CoreStruct.cpp
 	src/NativeFile.cpp
 	src/main.cpp
 

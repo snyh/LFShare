@@ -54,7 +54,7 @@ FInfo info_from_net(const char* data, size_t s)
   FInfo info;
   info.file_type = r.read<uint8_t>();
 
-  if (info.file_type != FInfo::Root)
+  if (info.file_type != FInfo::RootFile && info.file_type != FInfo::RootDir)
 	info.parent_hash = r.str(16);
 
   info.hash = r.str(16);
@@ -65,7 +65,7 @@ FInfo info_from_net(const char* data, size_t s)
 
   info.path = r.str();
 
-  if (info.lastchunksize > FInfo::chunksize)
+  if (info.lastchunksize > CHUNK_SIZE)
 	throw IllegalData();
 
   info.status = FInfo::Remote;
@@ -81,7 +81,7 @@ SendBufPtr info_to_net(const FInfo& info)
   uint8_t type = info.file_type;
   buf->add_val(&type, sizeof(uint8_t));
 
-  if (info.file_type != FInfo::Root)
+  if (info.file_type != FInfo::RootFile && info.file_type != FInfo::RootDir)
 	buf->add_val(info.parent_hash);
 
   buf->add_val(info.hash);
@@ -103,7 +103,6 @@ SendBufPtr info_to_net(const FInfo& info)
 SendBufPtr chunk_to_net(const Chunk& c)
 {
   SendBufPtr buf(new SendBuf);
-  buf->add_val("CHUNK\n");
 
   buf->add_val(c.file_hash);
 
@@ -134,7 +133,7 @@ Chunk chunk_from_net(const char* data, size_t size)
 
   c.data = r.data();
 
-  if (c.size > FInfo::chunksize)
+  if (c.size > CHUNK_SIZE)
 	throw IllegalData();
   return c;
 }
@@ -153,11 +152,8 @@ SendBufPtr bill_to_net(const Bill& b)
   uint16_t region = b.region;
   buf->add_val(&region, sizeof(uint16_t));
 
-  uint32_t bits = b.bits;
-  buf->add_val(&bits, sizeof(uint32_t));
-
-  uint8_t len = b.len;
-  buf->add_val(&len, sizeof(uint8_t));
+  BlockType bits = b.bits;
+  buf->add_val(&bits, sizeof(BlockType));
 
   return buf;
 }
@@ -168,7 +164,6 @@ Bill bill_from_net(const char* data, size_t s)
   Bill bill;
   bill.hash = r.str(16);
   bill.region = r.read<uint16_t>();
-  bill.bits = r.read<uint32_t>();
-  bill.len = r.read<uint8_t>();
+  bill.bits = r.read<BlockType>();
   return bill;
 }

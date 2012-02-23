@@ -1,5 +1,5 @@
 #include "AppWebServer/jrpc.hpp"
-#include "../FileManager.hpp"
+#include "../Dispatcher.hpp"
 #include <boost/filesystem.hpp>
 
 using namespace std;
@@ -35,21 +35,14 @@ MP info2json(const FInfo& info)
   node["hash"] = hash2str(info.hash);
   node["name"] = fs::path(info.path).filename().string();
   assert(info.chunknum > 0);
-  node["size"] = (info.chunknum-1) * FInfo::chunksize + info.lastchunksize;
-  node["status"] = info.type;
+  node["size"] = (info.chunknum-1) * CHUNK_SIZE + info.lastchunksize;
+  node["status"] = info.status;
 
   //当前本版不支持文件目录因此全是文件类型(0)
   node["type"] = 0;
   return node;
 }
 
-MP bits2json(const boost::dynamic_bitset<>& b)
-{
-  JRPC::JSON result;
-  for (int i=0; i<b.size(); i++) 
-	result[i] = b[i] ? 0: 1;
-  return result;
-}
 
 MP msg2json(const NewMsg& msg)
 {
@@ -133,7 +126,7 @@ JRPC::Service& rpc_filemanager(FileManager& theMFM)
 		{
 		  "chunk_info", [&](MP& j){
 			  auto b = theMFM.chunk_info(str2hash(j["hash"].asString()));
-			  return bits2json(b);
+			  return b;
 		  }
 		}
   };

@@ -22,14 +22,11 @@ struct Bill {
   Hash hash;
 
   /// 此Bill所属区域即bits起始位置, 一个区域拥有256块数据因此一共能表达
-  //	256 * 2^16 * 60000 = 937.5GB 大小的文件。
+  //	32 * 2^16 * 60000 = 117.1875GB 大小的文件。
   uint16_t region;
 
   /// 按位存储文件块是否缺少
-  uint32_t bits;
-
-  /// 表示bits中有效数据占多少位+1，值界于0～255
-  uint8_t len;
+  BlockType bits;
 };
 
 
@@ -38,7 +35,7 @@ struct Bill {
  * 		在网络传输时候至少占用80B, 最多占用2144B
  */
 struct FInfo {
-	enum Type {NormalFile, Directory, Root };
+	enum Type {NormalFile, Directory, RootFile, RootDir };
 	enum Status { Local, Downloading, Remote }; 
 
 	/// 表示此文件类型, NormalFile为普通文件, Directory为目录, Root为顶级文件或
@@ -63,9 +60,6 @@ struct FInfo {
 
 
 	// 以下成员并不再网络中进行传输
-	
-	/// 单个chunk的大小，当前为固定值60000B(config.hpp中定义)
-	static const uint16_t chunksize = CHUNK_SIZE;
 
 	/// 表示当前FInfo对应状态
 	Status status;
@@ -93,6 +87,8 @@ struct Chunk {
 
 	/// 指向数据真实存储地, 网络传输时占用大小1~CHUNKSIZE(60000) 
 	const char* data;
+
+	Chunk() = default;
 
 
 	Chunk(const Hash& fh, const Hash& ch, uint32_t i, uint16_t s, const char* d):

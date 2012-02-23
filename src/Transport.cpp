@@ -82,6 +82,7 @@ void Transport::handle_info(const FInfo& info)
 
 void Transport::handle_bill(const Bill& b)
 {
+  try {
   //cout << "handle_bill start" << endl;
   FInfo info = info_manager_.find(b.hash);
   uint32_t bit_offset = b.region*BLOCK_LEN;
@@ -109,6 +110,10 @@ void Transport::handle_bill(const Bill& b)
 			  send_chunk(b.hash, index, chunk_size);  //则发送
 		  }
 	  }
+  }
+  } catch (InfoNotFound& e) {
+	  string hash2str(const Hash&);
+	  cout << "throwed InfoNotFound :" << hash2str(b.hash) << endl;
   }
   //cout << "handle_bill end" << endl;
 }

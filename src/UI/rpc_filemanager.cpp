@@ -1,4 +1,4 @@
-#include "AppWebServer/jrpc.hpp"
+#include "../../../AppWebServer/jrpc.hpp"
 #include "../Dispatcher.hpp"
 #include <boost/filesystem.hpp>
 

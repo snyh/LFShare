@@ -96,7 +96,13 @@ private:
   boost::asio::io_service io_service_;
 
   boost::asio::ip::udp::socket scmd_;
+  boost::asio::ip::udp::endpoint ep_cmd_;
   boost::asio::ip::udp::socket sdata_;
+  boost::asio::ip::udp::endpoint ep_data_;
+
+  /// 用来探测ssend_使用的IP地址，以便忽略该地址的信息
+  void probe_local_ip();
+  boost::asio::ip::address local_ip_;
 
   boost::asio::ip::udp::socket ssend_;
 

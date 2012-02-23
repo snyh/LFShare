@@ -81,6 +81,9 @@ private:
 	Payload payload_tmp_;
 
 	/// 记录本地所缺少的文件块
+	//	注意每一region存放位置为: 从右向左.
+	//	比如第3region内容为(假设BLOCK_LEN为8): 0100 0000
+	//	则 上面内容为1的实际index是3*8+6 = 30,而非3*8+1=25;
 	std::map<Hash, std::vector<std::bitset<BLOCK_LEN>>> local_bill_;
 
 	/// 拥有完整拷贝的文件

@@ -27,7 +27,7 @@ void NativeFileManager::push_hot(const Hash& h)
 	  mapped_file_params param;
 	  param.path = info.path;
 	  param.flags = mapped_file::readwrite;
-	  param.new_file_size = (info.chunknum-1) * FInfo::chunksize + info.lastchunksize;
+	  param.new_file_size = (info.chunknum-1) * CHUNK_SIZE + info.lastchunksize;
 
 	  hot_.push_front(make_pair(info.hash, mapped_file(param)));
   } else if (info.status == FInfo::Downloading) {
@@ -75,23 +75,33 @@ void NativeFileManager::run()
   io_.run();
 }
 
+void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t s)
+{
+  set_current_file(h);
+  memcpy(current_+begin, src, s);
+}
 void NativeFileManager::async_write(const Hash& h, long begin, const char* src, size_t s, 
 									function<void()> cb)
 {
   io_.post([=](){
-		   set_current_file(h);
-		   memcpy(current_+begin, src, s);
+		   write(h, begin, src, s); 
 		   cb();
 		   });
 }
+
+void NativeFileManager::read(const Hash& h, long begin, char* dest, size_t s)
+{
+  assert(current_ != nullptr);
+  set_current_file(h);
+  memcpy(dest, current_+begin, s);
+}
+
 
 void NativeFileManager::async_read(const Hash& h, long begin, char* dest, size_t s,
 								   function<void()> cb)
 {
   io_.post([=](){
-		   assert(current_ != nullptr);
-		   set_current_file(h);
-		   memcpy(dest, current_+begin, s);
+		   read(h, begin, dest, s);
 		   cb();
 		   });
 }

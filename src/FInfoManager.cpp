@@ -22,13 +22,13 @@ FInfo FInfoManager::add_info(const std::string& path)
 		find(hash);
 		throw InfoExists();
 	} catch (InfoNotFound&) {
-		chunknum = filesize / FInfo::chunksize;
+		chunknum = filesize / CHUNK_SIZE; 
 
-		lastchunksize = filesize % FInfo::chunksize;
+		lastchunksize = filesize % CHUNK_SIZE;
 		chunknum += lastchunksize > 0 ? 1: 0;
 
 		FInfo info;
-		info.file_type = FInfo::NormalFile;
+		info.file_type = FInfo::RootFile;
 		info.hash = hash;
 		info.chunknum = chunknum;
 		info.path = path;

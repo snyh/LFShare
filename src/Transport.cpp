@@ -12,17 +12,17 @@ Transport::Transport(FInfoManager& info_manager)
 {
   //注册相关消息
   ndriver_.register_cmd_plugin("FILEINFO", 
-								[&](const char*data, size_t s){
+								[=](const char*data, size_t s){
 								try { handle_info(info_from_net(data, s)); }
 								catch (IllegalData&) {assert(!"IllegalData");}
 								});
   ndriver_.register_cmd_plugin("BILL",
-								[&](const char*data, size_t s){
+								[=](const char*data, size_t s){
 								try {handle_bill(bill_from_net(data, s));}
 								catch(IllegalData&) {assert(!"IllegalData");}
 								});
 
-  ndriver_.register_data_plugin([&](RecvBufPtr buf, size_t s){handle_chunk(buf, s);});
+  ndriver_.register_data_plugin([=](RecvBufPtr buf, size_t s){handle_chunk(buf, s);});
 
   //注册定时器以便统计速度
   ndriver_.start_timer(1, std::bind(&Transport::record_speed, this));
@@ -55,14 +55,11 @@ void Transport::cb_del_info(const Hash& h)
 void Transport::run() 
 {
   ndriver_.run(); 
-
-  assert(!"ndriver stoped");
 }
 
 void Transport::native_run() 
 {
   native_.run();
-  assert(!"native stoped");
 }
 
 
@@ -83,20 +80,22 @@ void Transport::handle_info(const FInfo& info)
 void Transport::handle_bill(const Bill& b)
 {
   try {
-  //cout << "handle_bill start" << endl;
   FInfo info = info_manager_.find(b.hash);
   uint32_t bit_offset = b.region*BLOCK_LEN;
   uint32_t last_index = info.chunknum - 1;
   assert(b.region <= info.chunknum/BLOCK_LEN);
+  bitset<BLOCK_LEN> bill_bits(b.bits);
 
   // 如果所属region是最后一个则有效长度为chunknum%BLOCK_LEN, 否则BLOCK_LEN为
   uint8_t len = (info.chunknum/BLOCK_LEN == b.region) ? (info.chunknum%BLOCK_LEN) : BLOCK_LEN;
 
   if (complete_.count(b.hash)) { 		//如果所请求文件本地拥有完整拷贝
 	  for (uint8_t i=0; i<len; i++) { //则全部发送
-		  uint32_t index = bit_offset+i; 
-		  uint16_t chunk_size = (index == last_index) ? info.lastchunksize : CHUNK_SIZE;
-		  send_chunk(b.hash, index, chunk_size);
+		  if (bill_bits[i]) {
+			  uint32_t index = bit_offset+i; 
+			  uint16_t chunk_size = (index == last_index) ? info.lastchunksize : CHUNK_SIZE;
+			  send_chunk(b.hash, index, chunk_size);
+		  }
 	  }
   } else if (incomplete_.count(b.hash)) {//如果所请求文件在下载队列中
 	  auto& bits = local_bill_.at(b.hash).at(b.region);
@@ -105,8 +104,6 @@ void Transport::handle_bill(const Bill& b)
 		  uint32_t index = bit_offset+i; 
 		  if (!bits[i]) {			//且本地拥有某文件块
 			  uint16_t chunk_size = (index == last_index) ? info.lastchunksize : CHUNK_SIZE;
-			  //cout << "in....incomplete has index" << index << endl;
-			  //cout << get_chunk_info(b.hash) << endl;
 			  send_chunk(b.hash, index, chunk_size);  //则发送
 		  }
 	  }
@@ -115,12 +112,10 @@ void Transport::handle_bill(const Bill& b)
 	  string hash2str(const Hash&);
 	  cout << "throwed InfoNotFound :" << hash2str(b.hash) << endl;
   }
-  //cout << "handle_bill end" << endl;
 }
 
 void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 {
-  //cout << "handle_chunk start" << endl;
   try {
 	  //尝试转换数据为Chunk
 	  char* data = buf->data(); 
@@ -142,15 +137,11 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 				  //就取消文件块缺失标记
 
 				  it->second.at(region)[offset] = false;
-				  cout << get_chunk_info(c.file_hash) << endl;
 				  //检查是否已经完成
 				  check_complete(c.file_hash);
 
 				  //同时记录此文件有效获得一次文件块以便统计此文件的下载速度
 				  payload_.files[c.file_hash]++;
-
-				  //继续发送Bill以便其他节点可以马上继续发送文件块
-				  ndriver_.add_task(90, std::bind(&Transport::send_bill, this, c.file_hash));
 
 				  // 用来使保存数据的shared_ptr不被销毁。
 				  buf;
@@ -168,14 +159,12 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 	  assert(!"IllegalData");
 	  return;
   }
-  //cout << "handle_chunk end" << endl;
 }
 
 /***************************发送信息函数**********************/
 
 void Transport::send_bill(const Hash& h)
 {
-  //cout << "send_bill start" << endl;
   int counter = 0;
   vector<bitset<BLOCK_LEN>>& bits = local_bill_[h];
   int num_region = bits.size();
@@ -185,13 +174,11 @@ void Transport::send_bill(const Hash& h)
 		  bill.hash = h;
 		  bill.region = i;
 		  bill.bits = bits[i].to_ulong();
-		  cout << "Will Send: Region " << i << " bits " << bits[i] << endl;
 		  ndriver_.cmd_send(bill_to_net(bill));
 		  if (counter++ > 10)
 			break;
 	  }
   }
-  //cout << "send_bill end" << endl;
 }
 
 void Transport::send_all_bill()
@@ -210,7 +197,6 @@ void Transport::send_all_bill()
 
 void Transport::send_chunk(const Hash& fh, uint32_t index, uint16_t size)
 {
-  cout << "NONONO" << endl;
   char* data;
   native_.async_read(fh, index*CHUNK_SIZE, data, size,
 					 [=](){ ndriver_.data_send(chunk_to_net(Chunk(fh, index, size, data)));}
@@ -271,7 +257,6 @@ Payload Transport::payload()
 void Transport::check_complete(const Hash& h)
 {
 
-  //cout << "check_complete start" << endl;
   FInfo info = info_manager_.find(h);
 
   uint32_t count = 0;
@@ -289,7 +274,6 @@ void Transport::check_complete(const Hash& h)
   //发送信号告知上层模块有新文件块已写入文件
   double progress = (info.chunknum-count) / double(info.chunknum);
   on_new_chunk(info.hash, progress);
-  //cout << "check_complete end" << endl;
 }
 
 

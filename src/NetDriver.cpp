@@ -12,6 +12,8 @@ void NetDriver::run()
 		;
 	  queue_.execute_all();
   }
+  io_service_.reset();
+  run();
 }
 
 void NetDriver::probe_local_ip()

@@ -177,8 +177,7 @@ CKACK ckack_from_net(const char* data, size_t s)
   bill.region = r.read<uint16_t>();
   bill.bits = r.read<BlockType>();
 
-  time_t t = static_cast<time_t>(r.read<uint64_t>());
-  return CKACK{t, bill};
+  return CKACK{r.read<uint16_t>(), bill};
 }
 SendBufPtr ckack_to_net(const CKACK& ack)
 {
@@ -194,8 +193,24 @@ SendBufPtr ckack_to_net(const CKACK& ack)
   BlockType bits = ack.bill.bits;
   buf->add_val(&bits, sizeof(BlockType));
 
-  uint64_t stamp = static_cast<uint64_t>(std::time(nullptr));
-  buf->add_val(&stamp, sizeof(uint64_t));
+  uint16_t p = ack.payload;
+  buf->add_val(&p, sizeof(uint16_t));
+
+  return buf;
+}
+
+Hash sb_from_net(const char* data, size_t s)
+{
+  ByteReader r(data, s);
+  return r.str(16);
+}
+SendBufPtr	sb_to_net(const Hash& h)
+{
+  SendBufPtr buf(new SendBuf);
+  MSG t = MSG::SENDBEGIN;
+  buf->add_val(&t, sizeof(MSG));
+
+  buf->add_val(h);
 
   return buf;
 }
@@ -208,7 +223,7 @@ Hash se_from_net(const char* data, size_t s)
 SendBufPtr	se_to_net(const Hash& h)
 {
   SendBufPtr buf(new SendBuf);
-  MSG t = MSG::SENDBEGIN;
+  MSG t = MSG::SENDEND;
   buf->add_val(&t, sizeof(MSG));
 
   buf->add_val(h);

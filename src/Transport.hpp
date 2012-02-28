@@ -20,26 +20,37 @@ public:
   SendHelper(Transport& t, const Hash& h, uint32_t max_i);
   void receive_sb();
   void deal_bill(const Bill& b);
+  /// 每隔一秒会自动调用此函数，若发现SendHelper在非END状态下切未发任何Chunk则自
+  //动转换为END状态且发送SENDEND信息以便其他节点可以尽快获知.
+  void timeout();
 private:
-	Hash hash_;
-	uint16_t pcr_;
-	uint16_t end_region_;
-	enum State {
-		BEGIN,
-		END,
-	} state_;
-	Transport& tp_;
-	uint32_t max_index_;
+  bool is_work_;
+  Hash hash_;
+  uint16_t pcr_;
+  uint16_t end_region_;
+  enum State {
+	  BEGIN,
+	  END,
+  } state_;
+  Transport& tp_;
+  uint32_t max_index_;
 };
 
 class RecvHelper {
 public:
   RecvHelper(Transport& t, const Hash& h, uint32_t max_i);
   void begin_receive();
+  void receive_se();
   /// 若缺少此文件块则返回True并标记为不缺
   bool ack(uint32_t index);
+  CKACK gen_ckack(uint16_t region);
   uint32_t count();
+
+  /// 每隔一秒会自动调用此函数,若发现RecvHelper没有收到任何此文件的任何Chunk则启
+  //动超时重传机制
+  void timeout();
 private:
+  bool is_work_;
   Hash hash_;
   boost::dynamic_bitset<> bits_;
   Transport& tp_;
@@ -87,7 +98,11 @@ private:
 	/// 发送已经构造好的Bill
 	void send_bill(const Bill&);
 
+	void send_sb(const Hash& fh);
+
 	void send_se(const Hash& fh);
+
+	void send_ckack(const CKACK& ack);
 
 	///从NetDriver处获得CHUNK数据时触发此函数，
 	void handle_chunk(RecvBufPtr buf, size_t s);
@@ -102,11 +117,16 @@ private:
 
 	void handle_sb(const Hash& b);
 
+	void handle_se(const Hash& b);
+
 	void sendqueue_new(const Hash& h);
 
 	void write_chunk(const Chunk&, std::function<void()>);
 
 	void check_complete(const Hash& h);
+
+	/// 检查是SendHelper或RecvHelper是否停止工作
+	void check_timeout();
 
 	/// 用来统计速度
 	void record_speed();

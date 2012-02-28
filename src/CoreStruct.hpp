@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 #include <array>
-#include <ctime>
 
 enum MSG : uint8_t {
 	FINFO,
@@ -13,6 +12,7 @@ enum MSG : uint8_t {
 	PAYLOAD,
 	INIT,
 	SENDBEGIN,
+	SENDEND,
 };
 
 /// 当前使用md4计算hash
@@ -121,7 +121,7 @@ struct Chunk {
 };
 
 struct CKACK {
-	std::time_t stamp;
+	uint16_t payload;
 	Bill bill;
 };
 
@@ -137,7 +137,10 @@ Bill 		bill_from_net(const char* data, size_t s);
 SendBufPtr 	bill_to_net(const Bill& b);
 
 CKACK		ckack_from_net(const char* data, size_t s);
-SendBufPtr	ckack_from_net(const CKACK&);
+SendBufPtr	ckack_to_net(const CKACK&);
+
+Hash 		sb_from_net(const char* data, size_t s);
+SendBufPtr	sb_to_net(const Hash&);
 
 Hash 		se_from_net(const char* data, size_t s);
 SendBufPtr	se_to_net(const Hash&);

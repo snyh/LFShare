@@ -1,11 +1,13 @@
 #include "Transport.hpp"
 #include "FInfoManager.hpp"
+#include <boost/thread/thread.hpp>
 
 using namespace std;
 namespace pl = std::placeholders;
 
 Transport::Transport(FInfoManager& info_manager)
 	:native_(5),
+	interval_(0),
 	info_manager_(info_manager),
 	ndriver_()
 {
@@ -27,6 +29,11 @@ Transport::Transport(FInfoManager& info_manager)
 								});
   ndriver_.register_cmd_plugin(MSG::SENDBEGIN,
 								[=](const char*data, size_t s){
+								try {handle_sb(sb_from_net(data, s));}
+								catch(IllegalData&) {assert(!"IllegalData");}
+								});
+  ndriver_.register_cmd_plugin(MSG::SENDEND,
+								[=](const char*data, size_t s){
 								try {handle_sb(se_from_net(data, s));}
 								catch(IllegalData&) {assert(!"IllegalData");}
 								});
@@ -36,9 +43,26 @@ Transport::Transport(FInfoManager& info_manager)
 
   //注册定时器以便统计速度
   ndriver_.start_timer(1, std::bind(&Transport::record_speed, this));
+  ndriver_.start_timer(1, std::bind(&Transport::check_timeout, this));
 
   info_manager_.on_new_info.connect(std::bind(&Transport::cb_new_info, this, pl::_1));
   info_manager_.on_del_info.connect(bind(&Transport::cb_del_info, this, pl::_1));
+}
+
+void Transport::check_timeout()
+{
+  for (auto& i : sendqueue_)
+	i.second.timeout();
+
+  vector<Hash> tmp;
+  for (auto& i: recvqueue_) {
+	  if (i.second.count() == 0)
+		tmp.push_back(i.first);
+	  else
+		i.second.timeout();
+  }
+  for (auto& h: tmp)
+	recvqueue_.erase(h);
 }
 
 void Transport::handle_info(const FInfo& info)
@@ -62,6 +86,13 @@ void Transport::sendqueue_new(const Hash& h)
 
 void Transport::handle_ckack(const CKACK& ack)
 {
+}
+
+void Transport::handle_se(const Hash& b)
+{
+  auto it = recvqueue_.find(b);
+  if (it != recvqueue_.end())
+	it->second.receive_se();
 }
 void Transport::handle_sb(const Hash& b)
 {
@@ -100,6 +131,8 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 			  buf;
 		  };
 		  write_chunk(c, cb);
+		  if (c.index != 0 && c.index % BLOCK_LEN == 0)
+			send_ckack(it->second.gen_ckack(c.index/BLOCK_LEN - 1));
 	  }
   }
 }
@@ -134,11 +167,23 @@ void Transport::send_chunk(const Hash& fh, uint32_t index)
   native_.async_read(fh, index*CHUNK_SIZE, data, size,
 					 [=](){ ndriver_.data_send(chunk_to_net(Chunk(fh, index, size, data)));}
 					);
+  // 默认延迟0ms
+  boost::this_thread::sleep(boost::posix_time::milliseconds(interval_));
+}
+
+void Transport::send_sb(const Hash& fh)
+{
+  ndriver_.cmd_send(sb_to_net(fh));
 }
 
 void Transport::send_se(const Hash& fh)
 {
   ndriver_.cmd_send(se_to_net(fh));
+}
+
+void Transport::send_ckack(const CKACK& ack)
+{
+  ndriver_.cmd_send(ckack_to_net(ack));
 }
 
 

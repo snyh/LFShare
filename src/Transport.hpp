@@ -1,7 +1,7 @@
 #ifndef _TRANSPOR_HPP__
 #define _TRANSPOR_HPP__
 #include "pre.hpp"
-//#include <boost/dynamic_bitset.hpp>
+#include <boost/dynamic_bitset.hpp>
 #include <bitset>
 #include "CoreStruct.hpp"
 #include "NetDriver.hpp"
@@ -11,6 +11,38 @@ class FInfoManager;
 struct Payload {
 	int global;
 	std::map<Hash, int> files;
+};
+
+class Transport;
+
+class SendHelper {
+public:
+  SendHelper(Transport& t, const Hash& h, uint32_t max_i);
+  void receive_sb();
+  void deal_bill(const Bill& b);
+private:
+	Hash hash_;
+	uint16_t pcr_;
+	uint16_t end_region_;
+	enum State {
+		BEGIN,
+		END,
+	} state_;
+	Transport& tp_;
+	uint32_t max_index_;
+};
+
+class RecvHelper {
+public:
+  RecvHelper(Transport& t, const Hash& h, uint32_t max_i);
+  void begin_receive();
+  /// 若缺少此文件块则返回True并标记为不缺
+  bool ack(uint32_t index);
+  uint32_t count();
+private:
+  Hash hash_;
+  boost::dynamic_bitset<> bits_;
+  Transport& tp_;
 };
 
 class Transport {
@@ -46,29 +78,33 @@ public:
 
 
 private:
+	friend class SendHelper;
+	friend class RecvHelper;
+
 	/// 发送指定文件的某块chunk
-	void send_chunk(const Hash& fh, uint32_t index, uint16_t size);
+	void send_chunk(const Hash& fh, uint32_t index);
 
-	/// 发送global_bill中所缺少的chunk
-	void send_all_chunk();
+	/// 发送已经构造好的Bill
+	void send_bill(const Bill&);
 
-	/// 发送local_bill中所缺少的bill
-	void send_all_bill();
+	void send_se(const Hash& fh);
 
-	/// 发送指定文件所缺少的bill
-	void send_bill(const Hash& fh);
-
-	/**
-	 * @brief 从NetDriver处获得CHUNK数据时触发此函数，
-	 *
-	 * @param buf 动态分配的空间用来保存chunk数据，是一个shared_ptr
-	 * @param s 数据大小
-	 */
+	///从NetDriver处获得CHUNK数据时触发此函数，
 	void handle_chunk(RecvBufPtr buf, size_t s);
 
-
-	void handle_bill(const Bill& b);
 	void handle_info(const FInfo& info);
+
+	void handle_bill(const Bill&);
+
+	void handle_ckack(const Bill&);
+
+	void handle_ckack(const CKACK& ack);
+
+	void handle_sb(const Hash& b);
+
+	void sendqueue_new(const Hash& h);
+
+	void write_chunk(const Chunk&, std::function<void()>);
 
 	void check_complete(const Hash& h);
 
@@ -80,21 +116,14 @@ private:
 	/// 用来统计当前这一秒的信息
 	Payload payload_tmp_;
 
-	/// 记录本地所缺少的文件块
-	//	注意每一region存放位置为: 从右向左.
-	//	比如第3region内容为(假设BLOCK_LEN为8): 0100 0000
-	//	则 上面内容为1的实际index是3*8+6 = 30,而非3*8+1=25;
-	std::map<Hash, std::vector<std::bitset<BLOCK_LEN>>> local_bill_;
-
-	/// 拥有完整拷贝的文件
-	std::set<Hash> complete_;
-
-	/// 正在下载队列中的文件
-	std::set<Hash> incomplete_;
+	/// 发包间隔,根据网络丢包率动态计算
+	int interval_;
 
 	NativeFileManager native_;
 	FInfoManager& info_manager_;
 	NetDriver ndriver_;
+	std::map<Hash, SendHelper> sendqueue_;
+	std::map<Hash, RecvHelper> recvqueue_;
 };
 
 #endif

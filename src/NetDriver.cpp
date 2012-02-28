@@ -78,18 +78,10 @@ void NetDriver::handle_receive_cmd(const boost::system::error_code& ec, size_t b
 }
 void NetDriver::call_cmd_plugin(size_t s)
 {
-  static const size_t KeyMaxSize = 16;
-
-  int pos = -1;
-  char* data = ibuf_.data();
-  pos = find(data, data+KeyMaxSize, '\n') - data;
-  if (pos <= 0) 
-	return;
-  string key(data, pos);
-
+  MSG key = static_cast<MSG>(ibuf_.data()[0]);
   auto it = cbs_cmd_.find(key);
   if (it != cbs_cmd_.end())
-	it->second(data+pos+1, s-pos-1);
+	it->second(ibuf_.data()+1, s-1);
 }
 
 void NetDriver::handle_receive_data(const boost::system::error_code& ec, size_t byte_transferred)

@@ -76,7 +76,8 @@ FInfo info_from_net(const char* data, size_t s)
 SendBufPtr info_to_net(const FInfo& info)
 {
   SendBufPtr buf(new SendBuf);
-  buf->add_val("FILEINFO\n");
+  MSG t = MSG::FINFO;
+  buf->add_val(&t, sizeof(MSG));
 
   uint8_t type = info.file_type;
   buf->add_val(&type, sizeof(uint8_t));
@@ -139,13 +140,13 @@ Chunk chunk_from_net(const char* data, size_t size)
 }
 
 
-
 SendBufPtr bill_to_net(const Bill& b)
 {
   assert(b.hash.size() == 16);
 
   SendBufPtr buf(new SendBuf);
-  buf->add_val("BILL\n");
+  MSG t = MSG::BILL;
+  buf->add_val(&t, sizeof(MSG));
 
   buf->add_val(b.hash);
 
@@ -166,4 +167,51 @@ Bill bill_from_net(const char* data, size_t s)
   bill.region = r.read<uint16_t>();
   bill.bits = r.read<BlockType>();
   return bill;
+}
+
+CKACK ckack_from_net(const char* data, size_t s)
+{
+  ByteReader r(data, s);
+  Bill bill;
+  bill.hash = r.str(16);
+  bill.region = r.read<uint16_t>();
+  bill.bits = r.read<BlockType>();
+
+  time_t t = static_cast<time_t>(r.read<uint64_t>());
+  return CKACK{t, bill};
+}
+SendBufPtr ckack_to_net(const CKACK& ack)
+{
+  SendBufPtr buf(new SendBuf);
+  MSG t = MSG::ACK;
+  buf->add_val(&t, sizeof(MSG));
+
+  buf->add_val(ack.bill.hash);
+
+  uint16_t region = ack.bill.region;
+  buf->add_val(&region, sizeof(uint16_t));
+
+  BlockType bits = ack.bill.bits;
+  buf->add_val(&bits, sizeof(BlockType));
+
+  uint64_t stamp = static_cast<uint64_t>(std::time(nullptr));
+  buf->add_val(&stamp, sizeof(uint64_t));
+
+  return buf;
+}
+
+Hash se_from_net(const char* data, size_t s)
+{
+  ByteReader r(data, s);
+  return r.str(16);
+}
+SendBufPtr	se_to_net(const Hash& h)
+{
+  SendBufPtr buf(new SendBuf);
+  MSG t = MSG::SENDBEGIN;
+  buf->add_val(&t, sizeof(MSG));
+
+  buf->add_val(h);
+
+  return buf;
 }

@@ -4,6 +4,16 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <ctime>
+
+enum MSG : uint8_t {
+	FINFO,
+	BILL,
+	ACK,
+	PAYLOAD,
+	INIT,
+	SENDBEGIN,
+};
 
 /// 当前使用md4计算hash
 typedef std::string  Hash;
@@ -110,6 +120,11 @@ struct Chunk {
 	}
 };
 
+struct CKACK {
+	std::time_t stamp;
+	Bill bill;
+};
+
 #include "BufType.hpp"
 
 FInfo 		info_from_net(const char* data, size_t s);
@@ -120,6 +135,12 @@ SendBufPtr 	chunk_to_net(const Chunk& c);
 
 Bill 		bill_from_net(const char* data, size_t s);
 SendBufPtr 	bill_to_net(const Bill& b);
+
+CKACK		ckack_from_net(const char* data, size_t s);
+SendBufPtr	ckack_from_net(const CKACK&);
+
+Hash 		se_from_net(const char* data, size_t s);
+SendBufPtr	se_to_net(const Hash&);
 
 class IllegalData : public std::exception {
 };

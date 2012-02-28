@@ -2,6 +2,7 @@
 #define __NetDriver_HPP__
 #include "pre.hpp"
 #include "BufType.hpp"
+#include "CoreStruct.hpp"
 
 class HandlerPriorityQueue {
 public:
@@ -70,8 +71,7 @@ public:
   void run();
   void stop();
 
-  void register_cmd_plugin(const std::string& key, RecvCmdFun cb) {
-	  assert(key.size() < 16);
+  void register_cmd_plugin(MSG key, RecvCmdFun cb) {
 	  this->cbs_cmd_.insert(make_pair(key, cb));
   }
   void register_data_plugin(RecvDataFun cb) {
@@ -110,7 +110,7 @@ private:
   RecvBufPtr dbuf_;
 
 
-  std::map<std::string, RecvCmdFun> cbs_cmd_;;
+  std::map<MSG, RecvCmdFun> cbs_cmd_;;
   RecvDataFun cb_data_;
 
   HandlerPriorityQueue queue_;

@@ -71,7 +71,7 @@ public:
   void run();
   void stop();
 
-  void register_cmd_plugin(MSG key, RecvCmdFun cb) {
+  void register_cmd_plugin(NetMSG key, RecvCmdFun cb) {
 	  this->cbs_cmd_.insert(make_pair(key, cb));
   }
   void register_data_plugin(RecvDataFun cb) {
@@ -110,7 +110,7 @@ private:
   RecvBufPtr dbuf_;
 
 
-  std::map<MSG, RecvCmdFun> cbs_cmd_;;
+  std::map<NetMSG, RecvCmdFun> cbs_cmd_;;
   RecvDataFun cb_data_;
 
   HandlerPriorityQueue queue_;

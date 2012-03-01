@@ -9,6 +9,8 @@ else(WIN32)
 	set(CMAKE_CXX_FLAGS "-static -std=c++0x -DAWS_DEBUG")
 endif(WIN32)
 
+include_directories("3dlib")
+
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
 add_executable(server

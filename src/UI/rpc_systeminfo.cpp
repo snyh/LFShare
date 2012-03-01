@@ -27,6 +27,8 @@
 #include <boost/filesystem.hpp>
 #include <vector>
 using namespace std;
+string to_utf8(const wstring&);
+wstring to_ucs2(const string&);
 
 struct Node {
 	int type;
@@ -47,7 +49,7 @@ namespace {
 		}
 	  }
 
-	vector<Node> list_file(const string& ps )
+	vector<Node> list_file(const wstring& ps )
 	  {
 		fs::path p(ps);
 		vector<Node> nodes;
@@ -64,8 +66,8 @@ namespace {
 			add_drivers(nodes);
 		} else if (p.has_parent_path()){
 			Node n{3,
-				p.parent_path().generic_string(),
-				p.filename().generic_string(),
+				to_utf8(p.parent_path().wstring()),
+				to_utf8(p.filename().wstring()),
 			};
 			nodes.push_back(n);
 		}
@@ -79,15 +81,15 @@ namespace {
 				if (fs::is_directory(dir_itr->status())) {
 					Node n{
 						2,
-						  dir_itr->path().generic_string(), 
-						  dir_itr->path().filename().generic_string()
+						  to_utf8(dir_itr->path().wstring()),
+						  to_utf8(dir_itr->path().filename().wstring()),
 					};
 					nodes.push_back(n);
 				} else if (fs::is_regular_file(dir_itr->status())) {
 					Node n{
 						1,
-						  dir_itr->path().generic_string(), 
-						  dir_itr->path().filename().generic_string()
+						  to_utf8(dir_itr->path().wstring()),
+						  to_utf8(dir_itr->path().filename().wstring()),
 					};
 					nodes.push_back(n);
 				}
@@ -110,7 +112,7 @@ JRPC::Service& rpc_systeminfo()
 			  JRPC::JSON result;
 			  if (j["path"].isString()) {
 				  string p(j["path"].asString());
-				  for (auto& n : list_file(p)) {
+				  for (auto& n : list_file(to_ucs2(p))) {
 					  JRPC::JSON node;
 					  node["type"] = n.type;
 					  node["path"] = n.path;

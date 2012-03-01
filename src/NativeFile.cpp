@@ -19,23 +19,27 @@ void NativeFileManager::new_file(const FInfo& info)
 void NativeFileManager::push_hot(const Hash& h)
 {
   using namespace boost::iostreams;
+  namespace fs = boost::filesystem;
   FInfo& info = files_.find(h)->second;
+  
+  fs::path path(to_ucs2(info.path));
 
   if (info.status == FInfo::Local) {
-	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
+	  hot_.push_front(make_pair(info.hash, mapped_file(path, mapped_file::readwrite)));
   } else if (info.status == FInfo::Remote) {
-	  mapped_file_params param;
-	  param.path = info.path;
+	  basic_mapped_file_params<fs::path> param;
+	  param.path = path;
 	  param.flags = mapped_file::readwrite;
 	  param.new_file_size = (info.chunknum-1) * CHUNK_SIZE + info.lastchunksize;
 
 	  hot_.push_front(make_pair(info.hash, mapped_file(param)));
   } else if (info.status == FInfo::Downloading) {
-	  hot_.push_front(make_pair(info.hash, mapped_file(info.path, mapped_file::readwrite)));
+	  hot_.push_front(make_pair(info.hash, mapped_file(path, mapped_file::readwrite)));
   }
 
   //设置当前数据流指向热度最高的文件
   current_= hot_.front().second.data();
+  assert(current_ != nullptr);
 }
 
 void NativeFileManager::set_current_file(const Hash& h)
@@ -89,19 +93,9 @@ void NativeFileManager::async_write(const Hash& h, long begin, const char* src, 
 		   });
 }
 
-void NativeFileManager::read(const Hash& h, long begin, char* dest, size_t s)
+char* NativeFileManager::read(const Hash& h, long begin)
 {
   assert(current_ != nullptr);
   set_current_file(h);
-  memcpy(dest, current_+begin, s);
-}
-
-
-void NativeFileManager::async_read(const Hash& h, long begin, char* dest, size_t s,
-								   function<void()> cb)
-{
-  io_.post([=](){
-		   read(h, begin, dest, s);
-		   cb();
-		   });
+  return current_ + begin;
 }

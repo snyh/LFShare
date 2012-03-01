@@ -1,17 +1,17 @@
 #include "FInfoManager.hpp"
 #include <boost/iostreams/device/mapped_file.hpp>
-
 using namespace std;
 using namespace boost;
 
-
-FInfo FInfoManager::add_info(const std::string& path)
+FInfo FInfoManager::add_info(const std::string& p)
 {
   //TODO: 增加目录支持
 	Hash hash;
 	int32_t chunknum;
 	int32_t lastchunksize;
 	uintmax_t filesize;
+
+	boost::filesystem::path path(to_ucs2(p));
 
 	filesize = filesystem::file_size(path);
 	iostreams::mapped_file file(path);
@@ -31,7 +31,7 @@ FInfo FInfoManager::add_info(const std::string& path)
 		info.file_type = FInfo::RootFile;
 		info.hash = hash;
 		info.chunknum = chunknum;
-		info.path = path;
+		info.path = p;
 		info.lastchunksize = lastchunksize;
 		info.status = FInfo::Local;
 

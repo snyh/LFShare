@@ -12,9 +12,8 @@ public:
 	void new_file(const FInfo&);
 
 	void async_write(const Hash& h, long begin, const char* data, size_t s, std::function<void()> cb);
-	void async_read(const Hash& h, long begin, char* data, size_t s, std::function<void()> cb);
 	void write(const Hash& h, long begin, const char* data, size_t s);
-	void read(const Hash& h, long begin, char* data, size_t s);
+	char* read(const Hash& h, long begin);
 private:
 	void set_current_file(const Hash& h);
 	void push_hot(const Hash& h);

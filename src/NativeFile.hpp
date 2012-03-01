@@ -24,6 +24,7 @@ private:
 	int max_num_;
 	boost::asio::io_service io_;
 	boost::asio::io_service::work io_work_;
+	boost::asio::io_service::strand strand_;
 };
 #endif
 

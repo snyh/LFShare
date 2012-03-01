@@ -89,6 +89,7 @@ JRPC::Service& rpc_dispatcher(Dispatcher& dispatcher)
 			  } catch (InfoExists&) {
 				  return JRPC::JSON("已经存在此文件"); 
 			  } catch (std::exception& e){
+				  throw;
 				  return JRPC::JSON(string("未知错误")+e.what()); 
 			  }
 		  }

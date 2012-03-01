@@ -201,7 +201,6 @@ SendBufPtr ckack_to_net(const CKACK& ack)
 
 Hash sb_from_net(const char* data, size_t s)
 {
-  cout << "sb_from_net size:" << s << endl;
   ByteReader r(data, s);
   Hash h = r.str(16);
   return h;

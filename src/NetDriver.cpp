@@ -7,13 +7,7 @@ namespace pl = std::placeholders;
 
 void NetDriver::run()
 {
-  while (io_service_.run_one()) {
-	  while (io_service_.poll_one())
-		;
-	  queue_.execute_all();
-  }
-  io_service_.reset();
-  run();
+  io_service_.run();
 }
 
 void NetDriver::probe_local_ip()
@@ -24,9 +18,10 @@ void NetDriver::probe_local_ip()
   int port = tmp.local_endpoint().port();
   ip::udp::endpoint p;
 
-  tmp.async_receive_from(buffer(buf), p, [&](const boost::system::error_code& e, size_t s) {
-						   local_ip_ = p.address();
-						});
+  tmp.async_receive_from(buffer(buf), p,
+						 [&](const boost::system::error_code& e, size_t s) {
+						 local_ip_ = p.address();
+						 });
   ssend_.send_to(buffer(buf), ip::udp::endpoint(ip::address_v4::broadcast(), port));
   io_service_.run();
   io_service_.reset();
@@ -35,16 +30,27 @@ void NetDriver::probe_local_ip()
 NetDriver::NetDriver()
 	:scmd_(io_service_, ip::udp::endpoint(ip::udp::v4(), UDP_CMD_PORT)),
 	sdata_(io_service_, ip::udp::endpoint(ip::udp::v4(), UDP_DATA_PORT)),
-	ssend_(io_service_, ip::udp::v4())
+	ssend_(io_service_, ip::udp::v4()),
+	strand_(io_service_)
 { 
+#ifdef WIN32
+  socket_base::receive_buffer_size win_buf(81920);
+  sdata_.set_option(win_buf);
+#endif
+  socket_base::receive_buffer_size option;
+  sdata_.get_option(option);
+  cout << "sockopt: " << option.value() << endl;
   ssend_.set_option(socket_base::broadcast(true));
   probe_local_ip();
   this->scmd_.async_receive_from(buffer(ibuf_), ep_cmd_,
-							queue_.wrap(100, bind(&NetDriver::handle_receive_cmd, this, pl::_1, pl::_2)));
+								 strand_.wrap(
+							bind(&NetDriver::handle_receive_cmd, this, pl::_1, pl::_2)));
 
   dbuf_ = RecvBufPtr(new RecvBuf);
   this->sdata_.async_receive_from(buffer(*dbuf_), ep_data_,
-							 queue_.wrap(100, bind(&NetDriver::handle_receive_data, this, pl::_1, pl::_2)));
+								  strand_.wrap(
+							 bind(&NetDriver::handle_receive_data, this, pl::_1, pl::_2)));
+
 
 }
 
@@ -52,13 +58,13 @@ NetDriver::NetDriver()
 void NetDriver::cmd_send(SendBufPtr buffer)
 {
   static ip::udp::endpoint imulticast(ip::address_v4::broadcast(), UDP_CMD_PORT);
-  io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), imulticast);}));
+  ssend_.send_to(buffer->to_asio_buf(), imulticast);
 }
 
 void NetDriver::data_send(SendBufPtr buffer) 
 {
   static ip::udp::endpoint dmulticast(ip::address_v4::broadcast(), UDP_DATA_PORT);
-  io_service_.post(queue_.wrap(20, [=](){ssend_.send_to(buffer->to_asio_buf(), dmulticast);}));
+  ssend_.send_to(buffer->to_asio_buf(), dmulticast);
 }
 
 void NetDriver::handle_receive_cmd(const boost::system::error_code& ec, size_t byte_transferred)
@@ -70,7 +76,8 @@ void NetDriver::handle_receive_cmd(const boost::system::error_code& ec, size_t b
 
 	  //继续监听
 	  this->scmd_.async_receive_from(buffer(ibuf_), ep_cmd_,
-								 queue_.wrap(100, bind(&NetDriver::handle_receive_cmd, this, pl::_1, pl::_2)));
+									 strand_.wrap(
+								 bind(&NetDriver::handle_receive_cmd, this, pl::_1, pl::_2)));
 
   } else {
 	  cerr << "!Error:" << boost::system::system_error(ec).what() << endl;
@@ -92,7 +99,9 @@ void NetDriver::handle_receive_data(const boost::system::error_code& ec, size_t 
 
 	  dbuf_ = RecvBufPtr(new RecvBuf);
 	  this->sdata_.async_receive_from(buffer(*dbuf_), ep_data_,
-		queue_.wrap(100, bind(&NetDriver::handle_receive_data,this, pl::_1, pl::_2)));
+									  strand_.wrap(
+		bind(&NetDriver::handle_receive_data,this, pl::_1, pl::_2))
+									  );
   } else {
 	  cerr << "!Error:" << boost::system::system_error(ec).what() << endl;
   }
@@ -101,11 +110,10 @@ void NetDriver::handle_receive_data(const boost::system::error_code& ec, size_t 
 void NetDriver::timer_helper(TimerPtr timer, int s, std::function<void()> cb)
 {
   timer->expires_from_now(boost::posix_time::seconds(s));
-  timer->async_wait(queue_.wrap(50, [=](boost::system::error_code&){
+  timer->async_wait([=](const boost::system::error_code&){
 								cb();
 								timer_helper(timer, s, cb);
-								})
-				   );
+								});
 }
 void NetDriver::start_timer(int s, std::function<void()> cb)
 {
@@ -116,5 +124,5 @@ void NetDriver::start_timer(int s, std::function<void()> cb)
 void NetDriver::add_task(int priority, std::function<void()> cb)
 {
   //空闲进程的优先级最低
-  io_service_.post(queue_.wrap(priority, cb));
+  io_service_.post(cb);
 }

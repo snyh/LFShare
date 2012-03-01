@@ -17,6 +17,7 @@ FInfo FInfoManager::add_info(const std::string& p)
 	iostreams::mapped_file file(path);
 
 	hash = hash_data(file.data(), filesize);
+	file.close();
 
 	try {
 		find(hash);

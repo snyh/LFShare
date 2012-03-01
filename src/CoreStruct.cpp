@@ -19,14 +19,14 @@ public:
 		T t = *(T*)(data_+pos_);
 		pos_ += sizeof(T);
 		if (pos_ > max_size_)
-		  throw IllegalData();
+		  throw IllegalData("ByteReader pos_>max_size");
 		return t;
 	}
   string str(uint32_t size) {
 	  string str(data_+pos_, size);
 	  pos_ += size;
 	  if (pos_ > max_size_)
-		throw IllegalData();
+		  throw IllegalData("ByteReader pos_>max_size");
 	  return str;
   }
   string str() {
@@ -66,7 +66,7 @@ FInfo info_from_net(const char* data, size_t s)
   info.path = r.str();
 
   if (info.lastchunksize > CHUNK_SIZE)
-	throw IllegalData();
+	throw IllegalData("infofrom_net():info.lastchunksize > CHUNK_SIZE");
 
   info.status = FInfo::Remote;
 
@@ -76,8 +76,8 @@ FInfo info_from_net(const char* data, size_t s)
 SendBufPtr info_to_net(const FInfo& info)
 {
   SendBufPtr buf(new SendBuf);
-  MSG t = MSG::FINFO;
-  buf->add_val(&t, sizeof(MSG));
+  NetMSG t = NetMSG::FINFO;
+  buf->add_val(&t, sizeof(NetMSG));
 
   uint8_t type = info.file_type;
   buf->add_val(&type, sizeof(uint8_t));
@@ -135,7 +135,7 @@ Chunk chunk_from_net(const char* data, size_t size)
   c.data = r.data();
 
   if (c.size > CHUNK_SIZE)
-	throw IllegalData();
+	throw IllegalData("chunk_from_net():c.size>CHUNK_SIZE");
   return c;
 }
 
@@ -145,8 +145,8 @@ SendBufPtr bill_to_net(const Bill& b)
   assert(b.hash.size() == 16);
 
   SendBufPtr buf(new SendBuf);
-  MSG t = MSG::BILL;
-  buf->add_val(&t, sizeof(MSG));
+  NetMSG t = NetMSG::BILL;
+  buf->add_val(&t, sizeof(NetMSG));
 
   buf->add_val(b.hash);
 
@@ -182,8 +182,8 @@ CKACK ckack_from_net(const char* data, size_t s)
 SendBufPtr ckack_to_net(const CKACK& ack)
 {
   SendBufPtr buf(new SendBuf);
-  MSG t = MSG::ACK;
-  buf->add_val(&t, sizeof(MSG));
+  NetMSG t = NetMSG::ACK;
+  buf->add_val(&t, sizeof(NetMSG));
 
   buf->add_val(ack.bill.hash);
 
@@ -201,14 +201,16 @@ SendBufPtr ckack_to_net(const CKACK& ack)
 
 Hash sb_from_net(const char* data, size_t s)
 {
+  cout << "sb_from_net size:" << s << endl;
   ByteReader r(data, s);
-  return r.str(16);
+  Hash h = r.str(16);
+  return h;
 }
 SendBufPtr	sb_to_net(const Hash& h)
 {
   SendBufPtr buf(new SendBuf);
-  MSG t = MSG::SENDBEGIN;
-  buf->add_val(&t, sizeof(MSG));
+  NetMSG t = NetMSG::SENDBEGIN;
+  buf->add_val(&t, sizeof(NetMSG));
 
   buf->add_val(h);
 
@@ -223,8 +225,8 @@ Hash se_from_net(const char* data, size_t s)
 SendBufPtr	se_to_net(const Hash& h)
 {
   SendBufPtr buf(new SendBuf);
-  MSG t = MSG::SENDEND;
-  buf->add_val(&t, sizeof(MSG));
+  NetMSG t = NetMSG::SENDEND;
+  buf->add_val(&t, sizeof(NetMSG));
 
   buf->add_val(h);
 

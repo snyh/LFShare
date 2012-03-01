@@ -5,7 +5,7 @@
 #include <string>
 #include <array>
 
-enum MSG : uint8_t {
+enum NetMSG : uint8_t {
 	FINFO,
 	BILL,
 	ACK,
@@ -145,8 +145,6 @@ SendBufPtr	sb_to_net(const Hash&);
 Hash 		se_from_net(const char* data, size_t s);
 SendBufPtr	se_to_net(const Hash&);
 
-class IllegalData : public std::exception {
-};
 class InfoNotFound : public std::exception {
 };
 class InfoExists: public std::exception {
@@ -160,6 +158,14 @@ public:
   HashInvalid(const std::string& msg): m_(msg) {}
   const char* what() const noexcept { return m_.c_str(); }
   ~HashInvalid() noexcept {}
+private:
+  std::string m_;
+};
+class IllegalData : public std::exception {
+public:
+  IllegalData(const std::string& msg): m_(msg) {}
+  const char* what() const noexcept { return m_.c_str(); }
+  ~IllegalData() noexcept {}
 private:
   std::string m_;
 };

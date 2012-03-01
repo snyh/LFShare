@@ -7,34 +7,34 @@ namespace pl = std::placeholders;
 
 Transport::Transport(FInfoManager& info_manager)
 	:native_(5),
-	interval_(0),
+	interval_(5),
 	info_manager_(info_manager),
 	ndriver_()
 {
   //注册相关消息
-  ndriver_.register_cmd_plugin(MSG::FINFO,
+  ndriver_.register_cmd_plugin(NetMSG::FINFO,
 								[=](const char*data, size_t s){
 								try {handle_info(info_from_net(data, s)); }
 								catch (IllegalData&) {assert(!"IllegalData");}
 								});
-  ndriver_.register_cmd_plugin(MSG::BILL,
+  ndriver_.register_cmd_plugin(NetMSG::BILL,
 								[=](const char*data, size_t s){
 								try {handle_bill(bill_from_net(data, s));}
 								catch(IllegalData&) {assert(!"IllegalData");}
 								});
-  ndriver_.register_cmd_plugin(MSG::ACK,
+  ndriver_.register_cmd_plugin(NetMSG::ACK,
 								[=](const char*data, size_t s){
 								try {handle_ckack(ckack_from_net(data, s));}
 								catch(IllegalData&) {assert(!"IllegalData");}
 								});
-  ndriver_.register_cmd_plugin(MSG::SENDBEGIN,
+  ndriver_.register_cmd_plugin(NetMSG::SENDBEGIN,
 								[=](const char*data, size_t s){
 								try {handle_sb(sb_from_net(data, s));}
 								catch(IllegalData&) {assert(!"IllegalData");}
 								});
-  ndriver_.register_cmd_plugin(MSG::SENDEND,
+  ndriver_.register_cmd_plugin(NetMSG::SENDEND,
 								[=](const char*data, size_t s){
-								try {handle_sb(se_from_net(data, s));}
+								try {handle_se(se_from_net(data, s));}
 								catch(IllegalData&) {assert(!"IllegalData");}
 								});
 
@@ -78,14 +78,42 @@ void Transport::handle_info(const FInfo& info)
 
 void Transport::sendqueue_new(const Hash& h)
 {
-  FInfo info = info_manager_.find(h);
-  if (info.status == FInfo::Local) {
-	  sendqueue_.insert(make_pair(h, SendHelper(*this, h, info.chunknum)));
+  try {
+	  FInfo info = info_manager_.find(h);
+	  if (info.status == FInfo::Local) {
+		  sendqueue_.insert(make_pair(h, SendHelper(*this, h, info.chunknum)));
+		  sendqueue_.find(h)->second.receive_sb();
+	  }
+  } catch (InfoNotFound&) {
   }
 }
 
 void Transport::handle_ckack(const CKACK& ack)
 {
+  return;
+  bitset<BLOCK_LEN> bits(ack.bill.bits);
+  double speed = ack.payload * 60000;
+  int loss = bits.count();
+  speed  = speed / 1024.0 /1024;
+  if (loss == 0) interval_ /= 2;
+  else if (loss < 8) interval_ += 2;
+  else if (loss < 16) interval_ += 5;
+  else if (loss < 24) interval_ += 10;
+  else if (loss < 32) interval_ += 16;
+  else if (loss == 32) interval_ = 40;
+  if (interval_ < 0) interval_ = 0;
+  if (interval_ > 40) interval_ = 40;
+
+  cout << "interval:" << interval_ << endl;
+}
+
+void Transport::handle_bill(const Bill& b)
+{
+  auto it = sendqueue_.find(b.hash);
+  if (it != sendqueue_.end()) {
+	  it->second.deal_bill(b);
+	  cout << "handle_bill....." << endl;
+  }
 }
 
 void Transport::handle_se(const Hash& b)
@@ -103,14 +131,6 @@ void Transport::handle_sb(const Hash& b)
 	sendqueue_new(b);
 }
 
-void Transport::handle_bill(const Bill& b)
-{
-  auto it = sendqueue_.find(b.hash);
-  if (it != sendqueue_.end()) {
-	  it->second.deal_bill(b);
-  }
-}
-
 void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 {
   //尝试转换数据为Chunk
@@ -120,19 +140,22 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
   auto it = recvqueue_.find(c.file_hash);
   if (it != recvqueue_.end()) {
 	  if (it->second.ack(c.index)) {
+		  assert(!it->second.ack(c.index));
+		  //同时记录此文件有效获得一次文件块以便统计此文件的下载速度
+		  payload_.files[c.file_hash]++;
+		  payload_.global++;
+
 		  function<void()> cb = [=]() {
-			  //检查是否已经完成
-			  check_complete(c.file_hash);
-
-			  //同时记录此文件有效获得一次文件块以便统计此文件的下载速度
-			  payload_.files[c.file_hash]++;
-
 			  // 用来使保存数据的shared_ptr不被销毁。
 			  buf;
+			  //检查是否已经完成
+			  check_complete(c.file_hash);
 		  };
 		  write_chunk(c, cb);
 		  if (c.index != 0 && c.index % BLOCK_LEN == 0)
 			send_ckack(it->second.gen_ckack(c.index/BLOCK_LEN - 1));
+	  } else {
+		  cout << "Alerady have " << c.index << endl;
 	  }
   }
 }
@@ -162,11 +185,10 @@ void Transport::write_chunk(const Chunk& c, function<void()> cb)
 void Transport::send_chunk(const Hash& fh, uint32_t index)
 {
   FInfo info = info_manager_.find(fh);
-  uint16_t size = info.chunknum == index ? info.lastchunksize : CHUNK_SIZE;
-  char* data;
-  native_.async_read(fh, index*CHUNK_SIZE, data, size,
-					 [=](){ ndriver_.data_send(chunk_to_net(Chunk(fh, index, size, data)));}
-					);
+  uint16_t size = (info.chunknum-1) == index ? info.lastchunksize : CHUNK_SIZE;
+  char* data = native_.read(fh, index*CHUNK_SIZE);
+  ndriver_.data_send(chunk_to_net(Chunk(fh, index, size, data)));
+  //cout << "Send Chunk: " << index << " size:" << size << endl;
   // 默认延迟0ms
   boost::this_thread::sleep(boost::posix_time::milliseconds(interval_));
 }
@@ -219,6 +241,8 @@ void Transport::check_complete(const Hash& h)
 
   if (count == 0) {
 	  info_manager_.modify_status(h, FInfo::Local);
+	  native_.close(h);
+	  recvqueue_.erase(h);
   }
   //发送信号告知上层模块有新文件块已写入文件
   double progress = (info.chunknum-count) / double(info.chunknum);
@@ -230,16 +254,16 @@ string Transport::get_chunk_info(const Hash& h)
 {
   return "1110001";
   /*
-  auto it = local_bill_.find(h);
-  if (it != local_bill_.end()) {
-	  string r;
-	  for (auto& i : it->second) {
-		  r.append(i.to_string());
-	  }
-	  return r;
-  }
-  throw InfoNotFound();
-  */
+	 auto it = local_bill_.find(h);
+	 if (it != local_bill_.end()) {
+	 string r;
+	 for (auto& i : it->second) {
+	 r.append(i.to_string());
+	 }
+	 return r;
+	 }
+	 throw InfoNotFound();
+	 */
 }
 
 void Transport::cb_new_info(const FInfo& f)
@@ -255,8 +279,7 @@ void Transport::cb_new_info(const FInfo& f)
 
 void Transport::cb_del_info(const Hash& h)
 {
-  //complete_.erase(h);
-  //incomplete_.erase(h);
+  native_.close(h);
 }
 
 void Transport::run() 
@@ -268,6 +291,5 @@ void Transport::native_run()
 {
   native_.run();
 }
-
 
 #include "TransportHelper.cpp"

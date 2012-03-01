@@ -4,63 +4,6 @@
 #include "BufType.hpp"
 #include "CoreStruct.hpp"
 
-class HandlerPriorityQueue {
-public:
-  	void add(int priority, std::function<void()> function) {
-		handlers_.push(QueuedHandler(priority, function));
-	}
-	void execute_all() {
-		while (!handlers_.empty()) {
-			auto handler = handlers_.top();
-			handler.execute();
-			handlers_.pop();
-		}
-	}
-
-	template<typename Handler>
-	class WrappedHandler {
-	public:
-	  WrappedHandler(HandlerPriorityQueue& q, int p, Handler h)
-		: queue_(q), priority_(p), handler_(h) {
-	  }
-	  template<typename... Args>
-		void operator()(Args... args) {
-			handler_(args...);
-		}
-	  HandlerPriorityQueue& queue_;
-	  int priority_;
-	  Handler handler_;
-	};
-
-	template <typename Handler>
-	  WrappedHandler<Handler> wrap(int priority, Handler handler) {
-		  return WrappedHandler<Handler>(*this, priority, handler);
-	  }
-
-private:
-	class QueuedHandler {
-	public:
-	  QueuedHandler(int p, std::function<void()> f)
-		: priority_(p), function_(f) {
-		}
-	  void execute() {
-		  function_();
-	  }
-	  friend bool operator< (const QueuedHandler& a, const QueuedHandler& b) {
-		  return a.priority_ < b.priority_;
-	  }
-	private:
-	  int priority_;
-	  std::function<void()> function_;
-	};
-	std::priority_queue<QueuedHandler> handlers_;
-};
-template <typename Function, typename Handler>
-void asio_handler_invoke(Function f, HandlerPriorityQueue::WrappedHandler<Handler>* h)
-{
-  h->queue_.add(h->priority_, f);
-}
-
 class NetDriver {
 public:
   typedef std::function<void(const char*, size_t)> RecvCmdFun;
@@ -113,7 +56,7 @@ private:
   std::map<NetMSG, RecvCmdFun> cbs_cmd_;;
   RecvDataFun cb_data_;
 
-  HandlerPriorityQueue queue_;
+  boost::asio::io_service::strand strand_;
 };
 
 #endif

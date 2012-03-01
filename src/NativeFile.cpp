@@ -5,7 +5,8 @@ NativeFileManager::NativeFileManager(int n):
 	current_(nullptr), 
 	max_num_(n),
 	io_(),
-	io_work_(io_) 
+	io_work_(io_) ,
+	strand_(io_)
 {
 }
 void NativeFileManager::new_file(const FInfo& info)
@@ -87,10 +88,10 @@ void NativeFileManager::write(const Hash& h, long begin, const char* src, size_t
 void NativeFileManager::async_write(const Hash& h, long begin, const char* src, size_t s, 
 									function<void()> cb)
 {
-  io_.post([=](){
-		   write(h, begin, src, s); 
-		   cb();
-		   });
+  //strand_.post([=](){
+			   write(h, begin, src, s); 
+			   cb();
+//			   });
 }
 
 char* NativeFileManager::read(const Hash& h, long begin)

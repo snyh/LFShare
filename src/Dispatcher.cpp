@@ -14,18 +14,11 @@ void Dispatcher::add_local_file(const string& path)
 {
   FInfo info = info_manager_.add_info(path);
   cb_new_file(info);
-  //transport_.add_completed_file(info.hash);
 }
 
 void Dispatcher::remove(const Hash& h)
 {
   FInfo info = info_manager_.del_info(h);
-  /*
-  if (info.type == FInfo::Local)
-	transport_.del_completed_file(h);
-  else if (info.type == FInfo::Downloading)
-	transport_.stop_receive(h);
-	*/
 }
 
 vector<FInfo> Dispatcher::current_list()

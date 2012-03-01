@@ -10,6 +10,7 @@ public:
 	NativeFileManager(int n);
 	void run();
 	void new_file(const FInfo&);
+	void close(const Hash& h);
 
 	void async_write(const Hash& h, long begin, const char* data, size_t s, std::function<void()> cb);
 	void write(const Hash& h, long begin, const char* data, size_t s);

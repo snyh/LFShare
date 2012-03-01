@@ -99,3 +99,13 @@ char* NativeFileManager::read(const Hash& h, long begin)
   set_current_file(h);
   return current_ + begin;
 }
+
+void NativeFileManager::close(const Hash& h)
+{
+  for (auto it = hot_.begin(); it != hot_.end(); it++) {
+	  if (it->first == h) {
+		  hot_.erase(it);
+		  break;
+	  }
+  }
+}

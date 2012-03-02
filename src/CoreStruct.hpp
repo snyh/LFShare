@@ -122,7 +122,7 @@ struct Chunk {
 
 struct CKACK {
 	uint16_t payload;
-	Bill bill;
+	uint8_t loss;
 };
 
 #include "BufType.hpp"

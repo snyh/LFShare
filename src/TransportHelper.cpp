@@ -1,3 +1,4 @@
+const int ONE_NUM = 128;
 SendHelper::SendHelper(Transport& t, const Hash& h, uint32_t max_i)
 	 :is_work_(false),
 	 hash_(h), 
@@ -14,6 +15,7 @@ void SendHelper::timeout()
   if (state_ != END && is_work_ == false) {
 	  state_ = END;
 	  tp_.send_se(hash_);
+	  cout << "***************Send Time Out!*************" << endl;
   }
 
   is_work_ = false;
@@ -60,13 +62,16 @@ RecvHelper::RecvHelper(Transport& t, const Hash& h, uint32_t max_i)
 :is_work_(false),
 	hash_(h),
 	bits_(max_i),
+	pb_(0),
+	pe_(0),
+	ppr_(0),
 	tp_(t)
 {
   // bits初始化时默认值为0
   bits_.flip();
 }
 
-void RecvHelper::begin_receive()
+void RecvHelper::send_bill()
 {
   if (bits_.none())
 	return;
@@ -78,36 +83,77 @@ void RecvHelper::begin_receive()
 
   bitset<BLOCK_LEN> bit;
 
-  tp_.send_sb(hash_);
-  assert(bits_.size() > 0);
+  if (ppr_ == 0)
+	tp_.send_sb(hash_);
+
+  int counter = 0;
 
   uint32_t cknum = bits_.size();
   uint16_t rgnum = cknum / BLOCK_LEN;
   uint8_t  lslen = cknum % BLOCK_LEN;
-  for (uint16_t region=0; region<rgnum; region++) {
-	  bill.region = region;
-	  uint32_t base = region * BLOCK_LEN;
+
+  for (; ppr_ < rgnum; ppr_++) {
+	  bill.region = ppr_;
+	  uint32_t base = ppr_* BLOCK_LEN;
 	  bit.reset();
-	  for (uint8_t i=0; i < BLOCK_LEN; i++) {
+	  for (uint8_t i=0; i < BLOCK_LEN; i++, pe_++) {
 		  bit[i] = bits_[base+i];
-		  //if (bit[i]) cout << "Request Chunk: " << (base+i) << endl;
+
+		  if (bits_[base+i])
+			counter++;
+		  if (counter == ONE_NUM/2)
+			pm_ = pe_;
+		  else if (counter > ONE_NUM)
+			break;
 	  }
 	  if (bit.any()) {
 		  bill.bits = bit.to_ulong();
 		  tp_.send_bill(bill);
 	  }
+	  if (counter == ONE_NUM/2)
+		pm_ = pe_;
+	  else if (counter > ONE_NUM)
+		break;
   }
-  if (lslen != 0) {
+  if (lslen != 0 && counter < ONE_NUM) {
 	  bill.region = rgnum;
 	  bit.reset();
-	  for (uint8_t i=0; i< lslen; i++) {
+	  for (uint8_t i=0; i< lslen; i++, pe_++) {
 		  uint32_t base = rgnum * BLOCK_LEN;
 		  bit[i] = bits_[base+i];
+		  if (counter == ONE_NUM/2)
+			pm_ = pe_;
+		  else if (counter > ONE_NUM)
+			break;
 		  //if (bit[i]) cout << "Request Chunk: " << (base+i) << endl;
 	  }
 	  bill.bits = bit.to_ulong();
 	  tp_.send_bill(bill);
   }
+}
+
+void RecvHelper::send_ckack()
+{
+  is_work_ = true;
+
+  CKACK ack;
+
+  int counter = 0;
+  for (uint32_t i=pb_; i<pm_; i++) {
+	  if (bits_.test(i))
+		counter++;
+  }
+
+  pb_ = pm_; 
+  pm_ = pe_;
+
+  ack.loss = counter;
+  assert(ack.loss >= 0);
+
+  ack.payload = tp_.payload().global;
+
+  tp_.send_ckack(ack);
+  send_bill();
 }
 
 bool RecvHelper::ack(uint32_t index)
@@ -124,33 +170,15 @@ bool RecvHelper::ack(uint32_t index)
   if (v)
 	bits_.reset(index);
 
+  if (index >= pm_ )
+	send_ckack(); //send_ckack后pm_就变成pe_了所以这里不会发送过的的CKACK
+
   return v;
 }
 
 uint32_t RecvHelper::count()
 {
   return bits_.count();
-}
-CKACK RecvHelper::gen_ckack(uint16_t region)
-{
-  is_work_ = true;
-
-  CKACK ack;
-  uint32_t base = region * BLOCK_LEN;
-  ack.bill.hash = hash_;
-  ack.bill.region = region;
-
-  uint8_t len = bits_.size() - region*BLOCK_LEN;
-  if (len > BLOCK_LEN) len = BLOCK_LEN;
-
-  bitset<BLOCK_LEN> bit;
-  for (uint8_t i=0; i<len; i++) {
-	  bit[i] = bits_[base+i];
-  }
-  ack.bill.bits = bit.to_ulong();
-
-  ack.payload = tp_.payload().global;
-  return ack;
 }
 
 
@@ -171,12 +199,16 @@ void RecvHelper::timeout()
 	  bill.region = region;
 	  bill.bits = bit.to_ulong();
 	  tp_.send_bill(bill);
+	  cout << "***************Recv Time Out!*************" << endl;
   }
   is_work_ = false;
 }
 
 void RecvHelper::receive_se()
 {
-  if (bits_.any())
-	begin_receive();
+  if (bits_.any()) {
+	  ppr_ = 0;
+	  pb_ = pe_ = pm_ =0;
+	  send_bill();
+  }
 }

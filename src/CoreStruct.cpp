@@ -172,12 +172,9 @@ Bill bill_from_net(const char* data, size_t s)
 CKACK ckack_from_net(const char* data, size_t s)
 {
   ByteReader r(data, s);
-  Bill bill;
-  bill.hash = r.str(16);
-  bill.region = r.read<uint16_t>();
-  bill.bits = r.read<BlockType>();
-
-  return CKACK{r.read<uint16_t>(), bill};
+  uint16_t p = r.read<uint16_t>();
+  uint8_t l = r.read<uint8_t>();
+  return CKACK{p, l};
 }
 SendBufPtr ckack_to_net(const CKACK& ack)
 {
@@ -185,16 +182,11 @@ SendBufPtr ckack_to_net(const CKACK& ack)
   NetMSG t = NetMSG::ACK;
   buf->add_val(&t, sizeof(NetMSG));
 
-  buf->add_val(ack.bill.hash);
-
-  uint16_t region = ack.bill.region;
-  buf->add_val(&region, sizeof(uint16_t));
-
-  BlockType bits = ack.bill.bits;
-  buf->add_val(&bits, sizeof(BlockType));
-
   uint16_t p = ack.payload;
   buf->add_val(&p, sizeof(uint16_t));
+
+  uint8_t l = ack.loss;
+  buf->add_val(&l, sizeof(uint8_t));
 
   return buf;
 }

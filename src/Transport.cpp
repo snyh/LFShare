@@ -90,19 +90,16 @@ void Transport::sendqueue_new(const Hash& h)
 
 void Transport::handle_ckack(const CKACK& ack)
 {
-  return;
-  bitset<BLOCK_LEN> bits(ack.bill.bits);
-  double speed = ack.payload * 60000;
-  int loss = bits.count();
-  speed  = speed / 1024.0 /1024;
-  if (loss == 0) interval_ /= 2;
-  else if (loss < 8) interval_ += 2;
-  else if (loss < 16) interval_ += 5;
-  else if (loss < 24) interval_ += 10;
-  else if (loss < 32) interval_ += 16;
-  else if (loss == 32) interval_ = 40;
+  payload_tmp_.global += ack.payload;
+  int loss = ack.loss;
+  if (loss < 2) interval_ /= 2;
+  else if (loss < 8) interval_ += 1;
+  else if (loss < 16) interval_ += 2;
+  else if (loss < 24) interval_ += 3;
+  else if (loss < 32) interval_ += 5;
+
   if (interval_ < 0) interval_ = 0;
-  if (interval_ > 40) interval_ = 40;
+  else if (interval_ > 10) interval_ = 10;
 
   cout << "interval:" << interval_ << endl;
 }
@@ -112,7 +109,6 @@ void Transport::handle_bill(const Bill& b)
   auto it = sendqueue_.find(b.hash);
   if (it != sendqueue_.end()) {
 	  it->second.deal_bill(b);
-	  cout << "handle_bill....." << endl;
   }
 }
 
@@ -142,8 +138,8 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 	  if (it->second.ack(c.index)) {
 		  assert(!it->second.ack(c.index));
 		  //同时记录此文件有效获得一次文件块以便统计此文件的下载速度
-		  payload_.files[c.file_hash]++;
-		  payload_.global++;
+		  payload_tmp_.files[c.file_hash]++;
+		  payload_tmp_.global++;
 
 		  function<void()> cb = [=]() {
 			  // 用来使保存数据的shared_ptr不被销毁。
@@ -152,8 +148,6 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 			  check_complete(c.file_hash);
 		  };
 		  write_chunk(c, cb);
-		  if (c.index != 0 && c.index % BLOCK_LEN == 0)
-			send_ckack(it->second.gen_ckack(c.index/BLOCK_LEN - 1));
 	  } else {
 		  cout << "Alerady have " << c.index << endl;
 	  }
@@ -167,7 +161,7 @@ void Transport::start_receive(const Hash& h)
 
   recvqueue_.insert(make_pair(h, RecvHelper(*this, h, info.chunknum)));
   auto it = recvqueue_.find(h);
-  it->second.begin_receive();
+  it->second.send_bill();
 }
 
 
@@ -214,9 +208,20 @@ void Transport::send_ckack(const CKACK& ack)
 //每隔一秒调用一次record_speed函数
 void Transport::record_speed()
 {
+  int global = (payload_.global + payload_tmp_.global) / 2;
+  std::map<Hash, int> files;
   //更新上一秒记录下的数据
-  payload_ = payload_tmp_;
+
+  for (auto& f: payload_.files) {
+	  files[f.first] = f.second;
+  }
+  for (auto& f: payload_tmp_.files) {
+	  files[f.first] += f.second;
+	  files[f.first] /=  2;
+  }
+
   //清空payload_tmp_以便下次重新计算
+  payload_ = Payload{global, files};
   payload_tmp_ = Payload();
 }
 

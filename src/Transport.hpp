@@ -39,17 +39,22 @@ private:
 class RecvHelper {
 public:
   RecvHelper(Transport& t, const Hash& h, uint32_t max_i);
-  void begin_receive();
+  void send_bill();
   void receive_se();
   /// 若缺少此文件块则返回True并标记为不缺
   bool ack(uint32_t index);
-  CKACK gen_ckack(uint16_t region);
   uint32_t count();
 
   /// 每隔一秒会自动调用此函数,若发现RecvHelper没有收到任何此文件的任何Chunk则启
   //动超时重传机制
   void timeout();
 private:
+  void send_ckack();
+
+  uint32_t pb_;
+  uint32_t pm_;
+  uint32_t pe_;
+  uint16_t ppr_;
   bool is_work_;
   Hash hash_;
   boost::dynamic_bitset<> bits_;

@@ -1,5 +1,5 @@
 SendHelper::SendHelper(Transport& t, const Hash& h, uint32_t max_i)
-	 :is_timeout_(false),
+	 :is_work_(false),
 	 hash_(h), 
 	 pcr_(0),
 	 max_index_(max_i),
@@ -11,13 +11,13 @@ SendHelper::SendHelper(Transport& t, const Hash& h, uint32_t max_i)
 
 void SendHelper::timeout()
 {
-  if (state_ != END && is_timeout_ == false) {
+  if (state_ != END && is_work_ == false) {
 	  state_ = END;
 	  tp_.send_se(hash_);
 	  FLog("%1%") % "***************Send Time Out!*************";
   }
 
-  is_timeout_ = false;
+  is_work_ = false;
 }
 
 void SendHelper::receive_sb() 
@@ -25,7 +25,7 @@ void SendHelper::receive_sb()
   if (state_ == END) {
 	  state_ = BEGIN;
 	  pcr_ = 0;
-	  is_timeout_ = true;
+	  is_work_ = true;
   }
 }
 
@@ -42,7 +42,7 @@ void SendHelper::deal_bill(const Bill& b)
   else
 	return;
 
-  is_timeout_ = true;
+  is_work_ = true;
 
   uint32_t base = b.region*BLOCK_LEN;
   for (int i=0; i<BLOCK_LEN; i++) {
@@ -65,12 +65,11 @@ void SendHelper::deal_bill(const Bill& b)
 }
 
 RecvHelper::RecvHelper(Transport& t, const Hash& h, uint32_t max_i)
-:is_timeout_(false),
+:is_work_(false),
 	is_stop_(false),
 	hash_(h),
 	bits_(max_i),
 	pb_(0),
-	pe_(0),
 	pm_(0),
 	ppr_(0),
 	threshold(128),
@@ -87,7 +86,7 @@ bool RecvHelper::send_bill()
   if (bits_.none())
 	return is_send;
 
-  is_timeout_ = true;
+  is_work_ = true;
 
   Bill bill;
   bill.hash = hash_;
@@ -96,10 +95,8 @@ bool RecvHelper::send_bill()
   if (ppr_ == 0) {
 	tp_.send_sb(hash_);
   }
-  // 调整阀值否则在剩余块数较少时无法发送
 
   int counter = 0;
-
 
   uint32_t cknum = bits_.size();
   uint16_t rgnum = cknum / BLOCK_LEN;
@@ -148,7 +145,7 @@ bool RecvHelper::send_bill()
 
 void RecvHelper::send_ckack()
 {
-  is_timeout_ = true;
+  is_work_ = true;
 
   CKACK ack;
 
@@ -175,7 +172,7 @@ bool RecvHelper::ack(uint32_t index)
   if (index >= bits_.size() || bits_.none())
 	return false;
 
-  is_timeout_ = true;
+  is_work_ = true;
 
   // 如果缺少对应块返回true, 否则返回false;
   bool v = bits_.test(index);
@@ -198,7 +195,7 @@ uint32_t RecvHelper::count()
 
 void RecvHelper::timeout()
 {
-  if (bits_.any() && is_timeout_ == false && !is_stop_) {
+  if (bits_.any() && is_work_ == false && !is_stop_) {
 	  //尽量减少超时重传的数据量, 这里只发送使发送端进入END状态的
 	  //最后一区域数据
 	  uint16_t region = bits_.size() / BLOCK_LEN;
@@ -220,7 +217,7 @@ void RecvHelper::timeout()
 	  }
 	  cout << endl;
   }
-  is_timeout_ = false;
+  is_work_ = false;
 }
 
 void RecvHelper::receive_se()

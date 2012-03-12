@@ -24,7 +24,7 @@ public:
   //动转换为END状态且发送SENDEND信息以便其他节点可以尽快获知.
   void timeout();
 private:
-  bool is_timeout_;
+  bool is_work_;
   Hash hash_;
   uint16_t pcr_;
   uint16_t end_region_;
@@ -57,7 +57,7 @@ private:
   uint32_t pm_;
   uint32_t pe_;
   uint16_t ppr_;
-  bool is_timeout_;
+  bool is_work_;
   bool is_stop_;
   Hash hash_;
   boost::dynamic_bitset<> bits_;

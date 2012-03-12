@@ -8,7 +8,8 @@ namespace pl = std::placeholders;
 
 Transport::Transport(FInfoManager& info_manager)
 	:native_(5),
-	interval_(1),
+	interval_(0),
+	is_recv_ack_(false),
 	info_manager_(info_manager),
 	ndriver_()
 {
@@ -52,6 +53,11 @@ Transport::Transport(FInfoManager& info_manager)
 
 void Transport::check_timeout()
 {
+  if (!is_recv_ack_) {
+	interval_ = 5;
+	FLog("timeout********set interval_=5");
+  }
+
   for (auto& i : sendqueue_)
 	i.second.timeout();
 
@@ -91,18 +97,19 @@ void Transport::sendqueue_new(const Hash& h)
 
 void Transport::handle_ckack(const CKACK& ack)
 {
+  is_recv_ack_ = true;
   payload_tmp_.global += ack.payload;
   int loss = ack.loss;
   if (loss < 2) interval_ /= 2;
   else if (loss < 8) interval_ += 1;
   else if (loss < 16) interval_ += 2;
   else if (loss < 24) interval_ += 3;
-  else if (loss < 32) interval_ += 5;
+  else  interval_ = 5;
 
   if (interval_ < 0) interval_ = 0;
-  else if (interval_ > 10) interval_ = 10;
+  else if (interval_ > 5) interval_ = 5;
 
-  FLog("interval %1%") % interval_;
+  FLog("interval:%1% loss:%2%") % interval_ % loss;
 }
 
 void Transport::handle_bill(const Bill& b)
@@ -162,7 +169,7 @@ void Transport::start_receive(const Hash& h)
 
   recvqueue_.insert(make_pair(h, RecvHelper(*this, h, info.chunknum)));
   auto it = recvqueue_.find(h);
-  it->second.send_bill();
+  it->second.begin_send();
 }
 
 
@@ -202,6 +209,7 @@ void Transport::send_se(const Hash& fh)
 
 void Transport::send_ckack(const CKACK& ack)
 {
+  FLog("************send ckack*****************");
   ndriver_.cmd_send(ckack_to_net(ack));
 }
 
@@ -301,5 +309,3 @@ void Transport::native_run()
 {
   native_.run();
 }
-
-#include "TransportHelper.cpp"

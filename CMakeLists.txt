@@ -18,6 +18,7 @@ add_executable(server
 	src/FInfoManager.cpp
 	src/NetDriver.cpp
 	src/Transport.cpp
+	src/TransportHelper.cpp
 	src/Dispatcher.cpp
 	src/CoreStruct.cpp
 	src/NativeFile.cpp

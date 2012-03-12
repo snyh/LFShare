@@ -35,32 +35,47 @@ private:
   Transport& tp_;
   uint32_t max_index_;
 };
+class RecordPos {
+public:
+  	RecordPos(boost::dynamic_bitset<>&);
+	std::vector<uint32_t> init();
+	std::vector<uint32_t> next();
+	bool is_milestone(uint32_t index);
+	void stop();
+	int get_loss();
+	boost::dynamic_bitset<>& bits_;
+private:
+	int loss_;
+	bool is_end_;
+	uint32_t pb;
+	uint32_t pe;
+	uint32_t pm;
+};
 
 class RecvHelper {
 public:
   RecvHelper(Transport& t, const Hash& h, uint32_t max_i);
+  RecvHelper(const RecvHelper& old);
   void start();
   void pause();
-  bool send_bill();
-  void receive_se();
+  void begin_send();
   /// 若缺少此文件块则返回True并标记为不缺
   bool ack(uint32_t index);
+  void receive_se();
   uint32_t count();
 
   /// 每隔一秒会自动调用此函数,若发现RecvHelper没有收到任何此文件的任何Chunk则启
   //动超时重传机制
   void timeout();
 private:
+  bool send_bill(const std::vector<uint32_t>&);
+  void send_end_bill();
   void send_ckack();
-  int threshold; 
-  uint32_t pb_;
-  uint32_t pm_;
-  uint32_t pe_;
-  uint16_t ppr_;
   bool is_work_;
   bool is_stop_;
   Hash hash_;
   boost::dynamic_bitset<> bits_;
+  RecordPos pos_;
   Transport& tp_;
 };
 
@@ -146,6 +161,7 @@ private:
 
 	/// 发包间隔,根据网络丢包率动态计算
 	int interval_;
+	bool is_recv_ack_;
 
 	NativeFileManager native_;
 	FInfoManager& info_manager_;

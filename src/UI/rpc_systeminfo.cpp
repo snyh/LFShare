@@ -26,9 +26,8 @@
 #include "../../../AppWebServer/jrpc.hpp"
 #include <boost/filesystem.hpp>
 #include <vector>
+#include "../tools.hpp"
 using namespace std;
-string to_utf8(const wstring&);
-wstring to_ucs2(const string&);
 
 struct Node {
 	int type;

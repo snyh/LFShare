@@ -224,15 +224,3 @@ SendBufPtr	se_to_net(const Hash& h)
   return buf;
 }
 
-std::string to_utf8(const std::wstring& s)
-{
-  string r;
-  utf8::utf16to8(s.begin(), s.end(), back_inserter(r));
-  return r;
-}
-std::wstring to_ucs2(const std::string& s)
-{
-  wstring r;
-  utf8::utf8to16(s.begin(), s.end(), back_inserter(r));
-  return r;
-}

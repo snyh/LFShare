@@ -1,4 +1,5 @@
 #include "NativeFile.hpp"
+#include "tools.hpp"
 using namespace std;
 
 NativeFileManager::NativeFileManager(int n): 

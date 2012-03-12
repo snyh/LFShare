@@ -1,13 +1,14 @@
 #include "Transport.hpp"
 #include "FInfoManager.hpp"
 #include <boost/thread/thread.hpp>
+#include "tools.hpp"
 
 using namespace std;
 namespace pl = std::placeholders;
 
 Transport::Transport(FInfoManager& info_manager)
 	:native_(5),
-	interval_(5),
+	interval_(1),
 	info_manager_(info_manager),
 	ndriver_()
 {
@@ -69,10 +70,10 @@ void Transport::handle_info(const FInfo& info)
 {
   try {
 	  info_manager_.add_info(info);
-	  cout << "NewInfo" << info.path << endl;
+	  FLog("%1% %2%") % "New Info" % info.path;
 	  on_new_file(info);
   } catch (InfoExists&) {
-	  cout << "文件已存在:" <<  info.path << endl;
+	  FLog("FileInfo %1% exits!") % info.path;
   }
 }
 
@@ -101,7 +102,7 @@ void Transport::handle_ckack(const CKACK& ack)
   if (interval_ < 0) interval_ = 0;
   else if (interval_ > 10) interval_ = 10;
 
-  cout << "interval:" << interval_ << endl;
+  FLog("interval %1%") % interval_;
 }
 
 void Transport::handle_bill(const Bill& b)
@@ -149,7 +150,7 @@ void Transport::handle_chunk(RecvBufPtr buf, size_t s)
 		  };
 		  write_chunk(c, cb);
 	  } else {
-		  cout << "Alerady have " << c.index << endl;
+		  FLog("******Alerady has Chunk:%1%*********") % c.index;
 	  }
   }
 }
@@ -168,6 +169,7 @@ void Transport::start_receive(const Hash& h)
 /***************************发送函数**********************/
 void Transport::send_bill(const Bill& b)
 {
+  FLog("Send Bill Region:%1% Bits:%2%") % b.region % bitset<BLOCK_LEN>(b.bits);
   ndriver_.cmd_send(bill_to_net(b));
 }
 
@@ -182,18 +184,19 @@ void Transport::send_chunk(const Hash& fh, uint32_t index)
   uint16_t size = (info.chunknum-1) == index ? info.lastchunksize : CHUNK_SIZE;
   char* data = native_.read(fh, index*CHUNK_SIZE);
   ndriver_.data_send(chunk_to_net(Chunk(fh, index, size, data)));
-  //cout << "Send Chunk: " << index << " size:" << size << endl;
   // 默认延迟0ms
   boost::this_thread::sleep(boost::posix_time::milliseconds(interval_));
 }
 
 void Transport::send_sb(const Hash& fh)
 {
+  FLog("************send begin*****************");
   ndriver_.cmd_send(sb_to_net(fh));
 }
 
 void Transport::send_se(const Hash& fh)
 {
+  FLog("************send end*****************");
   ndriver_.cmd_send(se_to_net(fh));
 }
 
@@ -285,6 +288,8 @@ void Transport::cb_new_info(const FInfo& f)
 void Transport::cb_del_info(const Hash& h)
 {
   native_.close(h);
+  sendqueue_.erase(h);
+  recvqueue_.erase(h);
 }
 
 void Transport::run() 

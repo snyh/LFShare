@@ -170,11 +170,4 @@ private:
   std::string m_;
 };
 
-#include "utf8.h"
-/// wchar在win平台下是2字节,linux下4字节.
-// 这里用wchar来表达ucs2不是很准确但不会影响使用
-std::wstring to_ucs2(const std::string&);
-std::string to_utf8(const std::wstring&);
-
-
 #endif

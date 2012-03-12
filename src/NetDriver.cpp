@@ -33,14 +33,15 @@ NetDriver::NetDriver()
 	ssend_(io_service_, ip::udp::v4()),
 	strand_(io_service_)
 { 
-#ifdef WIN32
-  socket_base::receive_buffer_size win_buf(81920);
-  sdata_.set_option(win_buf);
-#endif
-  socket_base::receive_buffer_size option;
-  sdata_.get_option(option);
-  cout << "sockopt: " << option.value() << endl;
+  // win(xp)下默认BufSize太小,8K. 
+  socket_base::receive_buffer_size recv_buf(65536*4);
+  sdata_.set_option(recv_buf);
+  scmd_.set_option(recv_buf);
+
+  socket_base::send_buffer_size send_buf(65536*4);
+  ssend_.set_option(send_buf);
   ssend_.set_option(socket_base::broadcast(true));
+
   probe_local_ip();
   this->scmd_.async_receive_from(buffer(ibuf_), ep_cmd_,
 								 strand_.wrap(

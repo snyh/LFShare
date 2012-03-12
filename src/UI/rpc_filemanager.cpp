@@ -1,6 +1,7 @@
 #include "../../../AppWebServer/jrpc.hpp"
 #include "../Dispatcher.hpp"
 #include <boost/filesystem.hpp>
+#include "../tools.hpp"
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -33,7 +34,7 @@ MP info2json(const FInfo& info)
 {
   JRPC::JSON node;
   node["hash"] = hash2str(info.hash);
-  node["name"] = fs::path(info.path).filename().string();
+  node["name"] = to_utf8(fs::path(to_ucs2(info.path)).filename().wstring());
   assert(info.chunknum > 0);
   node["size"] = (info.chunknum-1) * CHUNK_SIZE + info.lastchunksize;
   node["status"] = info.status;

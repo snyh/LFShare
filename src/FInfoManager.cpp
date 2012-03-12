@@ -1,4 +1,5 @@
 #include "FInfoManager.hpp"
+#include "tools.hpp"
 #include <boost/iostreams/device/mapped_file.hpp>
 using namespace std;
 using namespace boost;

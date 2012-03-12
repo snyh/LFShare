@@ -21,6 +21,7 @@ add_executable(server
 	src/Dispatcher.cpp
 	src/CoreStruct.cpp
 	src/NativeFile.cpp
+	src/tools.cpp
 	src/main.cpp
 
 	src/UI/rpc_filemanager.cpp

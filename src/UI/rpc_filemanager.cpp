@@ -5,7 +5,7 @@
 
 using namespace std;
 namespace fs = boost::filesystem;
-typedef const JRPC::JSON MP;
+typedef const AWS::JSON MP;
 
 string hash2str(const Hash& h)
 {
@@ -32,7 +32,7 @@ Hash str2hash(const string& s)
 
 MP info2json(const FInfo& info)
 {
-  JRPC::JSON node;
+  AWS::JSON node;
   node["hash"] = hash2str(info.hash);
   node["name"] = to_utf8(fs::path(to_ucs2(info.path)).filename().wstring());
   assert(info.chunknum > 0);
@@ -47,19 +47,19 @@ MP info2json(const FInfo& info)
 
 MP msg2json(const NewMsg& msg)
 {
-  JRPC::JSON result; result["newfile"]; result["pfile"]; result["progress"];
+  AWS::JSON result; result["newfile"]; result["pfile"]; result["progress"];
   for (auto& file: msg.new_files) {
 	  result["newfile"].append(info2json(file));
   }
   result["payload"] = msg.payload.global;
   for (auto& payload: msg.payload.files) {
-	  static JRPC::JSON node;
+	  static AWS::JSON node;
 	  node["hash"] = hash2str(payload.first);
 	  node["value"] = payload.second;
 	  result["pfile"].append(node);
   }
   for (auto& p : msg.progress) {
-	  static JRPC::JSON node;
+	  static AWS::JSON node;
 	  node["hash"] = hash2str(p.first);
 	  node["value"] = p.second;
 	  result["progress"].append(node);
@@ -68,14 +68,14 @@ MP msg2json(const NewMsg& msg)
 }
 
 
-JRPC::Service& rpc_dispatcher(Dispatcher& dispatcher)
+AWS::Service& rpc_dispatcher(Dispatcher& dispatcher)
 {
-  static JRPC::Service the_dispatcher;
+  static AWS::Service the_dispatcher;
   the_dispatcher.name = "filemanager";
   the_dispatcher.methods = {
 		{
 		  "file_list", [&](MP& j){
-			  JRPC::JSON result;
+			  AWS::JSON result;
 			  for (auto i : dispatcher.current_list()) {
 				  result.append(info2json(i));
 			  }
@@ -86,12 +86,12 @@ JRPC::Service& rpc_dispatcher(Dispatcher& dispatcher)
 		  "add_file", [&](MP& j){
 			  try {
 				  dispatcher.add_local_file(j["path"].asString());
-				  return JRPC::JSON("添加文件成功");
+				  return AWS::JSON("添加文件成功");
 			  } catch (InfoExists&) {
-				  return JRPC::JSON("已经存在此文件"); 
+				  return AWS::JSON("已经存在此文件"); 
 			  } catch (std::exception& e){
 				  throw;
-				  return JRPC::JSON(string("未知错误")+e.what()); 
+				  return AWS::JSON(string("未知错误")+e.what()); 
 			  }
 		  }
 		},
@@ -99,11 +99,11 @@ JRPC::Service& rpc_dispatcher(Dispatcher& dispatcher)
 		  "del_file", [&](MP& j){
 			  try {
 				  dispatcher.remove(str2hash(j["hash"].asString()));
-				  return JRPC::JSON("成功删除");
+				  return AWS::JSON("成功删除");
 			  } catch (InfoNotFound&) {
-				  return JRPC::JSON("所删除文件不存在");
+				  return AWS::JSON("所删除文件不存在");
 			  } catch (HashInvalid& e) {
-				  return JRPC::JSON(string("所删除文件哈希无效:") + e.what());
+				  return AWS::JSON(string("所删除文件哈希无效:") + e.what());
 			  }
 		  }
 		},
@@ -111,11 +111,11 @@ JRPC::Service& rpc_dispatcher(Dispatcher& dispatcher)
 		  "download", [&](MP& j){
 			  try {
 				  dispatcher.start_download(str2hash(j["hash"].asString()));
-				  return JRPC::JSON("下载请求提交成功");
+				  return AWS::JSON("下载请求提交成功");
 			  } catch (InfoNotFound&) {
-				  return JRPC::JSON("文件不存在");
+				  return AWS::JSON("文件不存在");
 			  } catch (HashInvalid& e) {
-				  return JRPC::JSON(string("文件哈希无效:") + e.what());
+				  return AWS::JSON(string("文件哈希无效:") + e.what());
 			  }
 		  }
 		},

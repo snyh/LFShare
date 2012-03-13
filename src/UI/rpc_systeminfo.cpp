@@ -101,18 +101,18 @@ namespace {
 	  }
 }
 
-JRPC::Service& rpc_systeminfo()
+AWS::Service& rpc_systeminfo()
 {
-  static JRPC::Service systeminfo;
+  static AWS::Service systeminfo;
   systeminfo.name = "systeminfo";
   systeminfo.methods = {
 		{
-		  "list_file", [](const JRPC::JSON& j){
-			  JRPC::JSON result;
+		  "list_file", [](const AWS::JSON& j){
+			  AWS::JSON result;
 			  if (j["path"].isString()) {
 				  string p(j["path"].asString());
 				  for (auto& n : list_file(to_ucs2(p))) {
-					  JRPC::JSON node;
+					  AWS::JSON node;
 					  node["type"] = n.type;
 					  node["path"] = n.path;
 					  node["name"] = n.name;
@@ -122,6 +122,13 @@ JRPC::Service& rpc_systeminfo()
 			  return result;
 		  }
 		},
+		{
+		  "close_server", [](const AWS::JSON& j) {
+			  cout << "close_server" << endl;
+			  exit(0);
+			  return AWS::JSON();
+		  }
+		}
   };
   return systeminfo;
 }

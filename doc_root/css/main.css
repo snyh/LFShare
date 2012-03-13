@@ -1,0 +1,141 @@
+body,
+li,
+ul {
+  margin: 0px;
+  padding: 0px;
+}
+.tab_title {
+  left: 20px;
+  line-height: normal;
+  text-align: center;
+}
+.hide {
+  display: none !important;
+}
+#c_local {
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+}
+#c_local .list {
+  width: 600px;
+  max-height: 500px;
+  min-height: 300px;
+}
+#local_info {
+  background: url(../img/alert-lines.png) repeat-x scroll left top #eeeeee;
+  clear: both;
+}
+.node {
+  float: left;
+  width: 100px;
+  list-style: none;
+  margin: 0px 5px;
+}
+.node:hover {
+  background: #cccccc;
+}
+.node .n_name {
+  text-align: center;
+  background: #eee;
+  overflow: hide;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.node .n_path {
+  display: none !important;
+}
+.node .i_file {
+  background: url("/img/b_file.png") no-repeat;
+  width: 100px;
+  height: 60px;
+  margin: 0px 20px;
+}
+.node .i_dir {
+  background: url("/img/b_dir.png") no-repeat;
+  width: 100px;
+  height: 60px;
+  margin: 0px 20px;
+}
+.node .i_parent {
+  background: url("/img/b_parent.png") no-repeat;
+  width: 100px;
+  height: 60px;
+  margin: 0px 20px;
+}
+.node .i_driver {
+  background: url("/img/b_driver.png") no-repeat;
+  width: 100px;
+  height: 60px;
+  margin: 0px 20px;
+}
+.node .i_computer {
+  background: url("/img/b_computer.png") no-repeat;
+  width: 100px;
+  height: 60px;
+  margin: 0px 20px;
+}
+.item:hover {
+  background: green;
+  line-height: 32px;
+}
+#c_file_list ul {
+  padding: 0px;
+  margin: 0px;
+}
+#c_file_list li {
+  list-style: none;
+}
+#c_file_list .title {
+  padding: 0px;
+  margin: 0px;
+  background: #ccc;
+}
+.dir {
+  height: 32px;
+  width: 32px;
+  background: url("/img/dir.png") center no-repeat;
+}
+.file {
+  height: 32px;
+  width: 32px;
+  background: url("/img/file.png") center no-repeat;
+}
+.local1 {
+  left-margin: 10px;
+  height: 32px;
+  width: 32px;
+  background: url("/img/local1.png") center no-repeat;
+}
+.local2 {
+  left-margin: 10px;
+  height: 32px;
+  width: 32px;
+  background: url("/img/local2.png") center no-repeat;
+}
+.remote {
+  left-margin: 10px;
+  height: 32px;
+  width: 32px;
+  background: url("/img/remote.png") center no-repeat;
+}
+.sp40 {
+  display: -moz-inline-box;
+  display: inline-block;
+  min-width: 40;
+}
+.sp60 {
+  display: -moz-inline-box;
+  display: inline-block;
+  min-width: 60;
+}
+.sp100 {
+  display: -moz-inline-box;
+  display: inline-block;
+  min-width: 100;
+}
+.sp250 {
+  display: -moz-inline-box;
+  display: inline-block;
+  min-width: 250;
+}

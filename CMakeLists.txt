@@ -33,6 +33,7 @@ add_executable(server
 	../AppWebServer/request_response.cpp
 	../AppWebServer/server.cpp
 	../AppWebServer/session.cpp
+	../AppWebServer/DetectBrowser.cpp
 	)
 
 if(WIN32) 

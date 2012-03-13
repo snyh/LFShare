@@ -4,8 +4,8 @@
 
 using namespace std;
 
-JRPC::Service& rpc_dispatcher(Dispatcher&);
-JRPC::Service& rpc_systeminfo();
+AWS::Service& rpc_dispatcher(Dispatcher&);
+AWS::Service& rpc_systeminfo();
 
 
 int main()
@@ -14,12 +14,13 @@ int main()
   boost::thread t1(bind(&Dispatcher::network_start, &dispatcher));
   boost::thread t2(bind(&Dispatcher::native_start, &dispatcher));
 
-  JRPC::Server rpc;
+  AWS::JSONPServer rpc;
   rpc.install_service(rpc_dispatcher(dispatcher));
   rpc.install_service(rpc_systeminfo());
 
-  Server s;
+  AWS::HTTPServer s;
   s.set_rpc(rpc);
+  s.open_browser();
   s.run();
 
   t1.join();

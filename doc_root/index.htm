@@ -1,0 +1,110 @@
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<link rel="Stylesheet" type="text/css" href="/css/main.css" />
+		<link rel="Stylesheet" type="text/css" href="/css/jquery-ui-1.8.17.custom.css" />
+		<link rel="Stylesheet" type="text/css" href="/css/jquery.contextMenu.css" />
+		<link rel="Stylesheet" type="text/css" href="/css/jquery.noty.css" />
+		<title>LPDownloader 局域网大文件并发传输</title>
+	</head>
+
+	<body>
+		<div id="layout">
+			<div id="menu" class="menuable">
+				<ul> 
+					<li><div id="c_share"><a href="#c_file_list">共享文件</a></div></li>
+					<li><a href="#c_local">本地文件</a></li>
+					<li><a href="#c_control">控制中心</a></li>
+					<li><a href="#c_help">帮助</a></li>
+					<li class="tab_title">LPDownloader 局域网大文件并发传输工具</li>
+				</ul>
+				<div id="c_file_list">
+					<ul class="title"> 
+						<li>
+							<span class="sp20"></span>
+							<span class="sp40">状态</span>
+							<span class="sp40">类型</span>
+							<span class="sp250">名称</span>
+							<span class="sp100">大小</span>
+							<span class="sp60">进度</span>
+							<span class="sp100">速度</span>
+							<span class="sp250">剩余时间</span>
+						</li>
+					</ul>
+					<script id="list_temp" type="text/x-jquery-tmpl">
+						<li class="item" id={{=hash}}>
+						<span class="hide"></span>
+						<span class="sp20"></span>
+						<span class="sp40 {{=status}}"></span>
+						<span class="sp40 {{=type}}"></span>
+						<span class="sp250">{{=name}}</span>
+						<span class="sp100">{{=size}}</span>
+						<span class="sp60 progress">{{=progress}}%</span>
+						<span class="sp100 speed">{{=speed}}</span>
+						<span class="sp250 time">{{=time}}</span>
+						</li>
+					</script>
+					<ul class="list"></ul>
+				</div>
+				<div id="c_local">
+					<script id="local_temp" type="text/x-jquery-tmpl">
+						<li class="node">
+						<div class={{=type}}></div>
+						<div class="n_name">{{=name}}</div>
+						<span class="n_path">{{=path}}</span>
+						</li>
+					</script>
+					<ul class="list"></ul>
+					<div id="local_info">双击图标就可以共享到局域网中了. </div>
+				</div>
+				<div id="c_control">配置文件路径</div>
+				<div id="c_help">自己慢慢试吧 很简单的</div>
+			</div>
+			<div id="payload">
+				<span>局域网负荷: <span id="p_global">0</span>Mb/s</span>
+				<span>本机下载速度:<span id="p_down">0</span>Mb/s</span>
+			</div>
+		</div>
+
+		<ul id="filemenu" class="contextMenu">
+			<li class="item">
+				<a href="#delete">网络负荷</a>
+			</li>
+		</ul>
+
+		<script type="text/javascript" src="/js/json2.js"></script>
+		<script type="text/javascript" src="/js/jquery-1.7.1.min.js"></script>
+		<script type="text/javascript" src="/js/jsrender.js"></script>
+		<script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+		<script type="text/javascript" src="/js/jquery.contextMenu.js"></script>
+		<script type="text/javascript" src="/js/jquery.noty.js"></script>
+		<script type="text/javascript" src="/js/main.js"></script>
+
+		<ul id="local_menu" class="contextMenu">
+			<li><a href="#delete">删除</a></li>
+			<li><a href="#info">属性</a></li>
+		</ul>
+		<ul id="download_menu1" class="contextMenu">
+			<li><a href="#download">下载</a></li>
+			<li><a href="#delete">删除</a></li>
+			<li><a href="#info">属性</a></li>
+		</ul>
+		<ul id="download_menu2" class="contextMenu">
+			<li><a href="#download">暂停</a></li>
+			<li><a href="#delete">删除</a></li>
+			<li><a href="#info">属性</a></li>
+		</ul>
+
+		<ul id="remote_menu" class="contextMenu">
+			<li><a href="#download">下载</a></li>
+			<li><a href="#delete">删除</a></li>
+			<li><a href="#info">属性</a></li>
+		</ul>
+		<div id="d_down" class="hide" title="下载文件">
+			下载路径: <input type="file"/>
+			<br/>
+			<button value="确认" />
+			<button value="取消" />
+		</div>
+	</body>
+</html>

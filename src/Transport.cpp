@@ -8,7 +8,7 @@ namespace pl = std::placeholders;
 
 Transport::Transport(FInfoManager& info_manager)
 	:native_(5),
-	interval_(0),
+	interval_(INTERVAL_INIT),
 	is_recv_ack_(false),
 	info_manager_(info_manager),
 	ndriver_()

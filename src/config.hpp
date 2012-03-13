@@ -16,4 +16,10 @@ typedef uint32_t BlockType;
 /// BILL bits 的大小
 const int BLOCK_LEN = sizeof(BlockType)*8;
 
+#ifdef WIN
+const int INTERVAL_INIT = 0;
+#else
+const int INTERVAL_INIT = 5;
+#endif
+
 #endif
